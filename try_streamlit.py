@@ -12,6 +12,7 @@ from googleapiclient.http import MediaIoBaseDownload
 from googleapiclient.errors import HttpError
 import os
 import json
+import tempfile
 
 
 # Define the braces and their forms
@@ -39,6 +40,7 @@ BracesForms = {
         'L3916': 'https://docs.google.com/forms/d/e/1FAIpQLSd4XQox2yt3wsild0InVMgagrcQ9Aors4PjExoOILHiT9grew/formResponse'
     }
 }
+
 def sanitize_filename(filename):
     return re.sub(r'[<>:"/\\|?*\x00-\x1F]', '', filename)
 
@@ -92,7 +94,7 @@ def combine_pdfs(fname):
             fh.seek(0)
             file_content = fh.read()
 
-            temp_pdf_path = os.path.join(os.getcwd(), f"temp_{sanitized_file_name}.pdf")
+            temp_pdf_path = os.path.join(tempfile.gettempdir(), f"temp_{sanitized_file_name}.pdf")
             with open(temp_pdf_path, "wb") as f:
                 f.write(file_content)
 
@@ -101,7 +103,7 @@ def combine_pdfs(fname):
 
             os.remove(temp_pdf_path)
 
-        combined_pdf_path = os.path.join(os.getcwd(), f"{sanitize_filename(fname)}_combined.pdf")
+        combined_pdf_path = os.path.join(tempfile.gettempdir(), f"{sanitize_filename(fname)}_combined.pdf")
         with open(combined_pdf_path, "wb") as f:
             merger.write(f)
 
@@ -190,93 +192,77 @@ def main():
 
     def validate_all_fields():
         required_fields = [
-            fname, lname, ptPhone, ptAddress,
-            ptCity, ptState, ptZip, ptDob, medID,
-            ptHeight, ptWeight, drName,
-            drAddress, drCity, drState, drZip,
-            drPhone, drFax, drNpi
+            fname, lname, ptPhone, ptAddress, ptCity, ptState, ptZip,
+            ptDob, medID, ptHeight, ptWeight, ptGender, drName, drAddress,
+            drCity, drState, drZip, drPhone, drFax, drNpi
         ]
-        for field in required_fields:
-            if not field:
-                st.warning(f"{field} is required.")
-                return False
-        return True
-
+        if not all(required_fields):
+            return False, "All fields are required."
+        return True, None
 
     if st.button("Submit"):
-        if not validate_all_fields():
-            st.warning("Please fill out all required fields.")
+        is_valid, validation_message = validate_all_fields()
+        if not is_valid:
+            st.error(validation_message)
         else:
-            selected_urls = []
-            for brace_type, brace_code in selected_forms.items():
-                if brace_code != "None":
-                    url = BracesForms[brace_type][brace_code]
-                    selected_urls.append((brace_type, url))
+            patient_params = {
+                "entry.1013683290": date,
+                "entry.1096785263": fname,
+                "entry.1842745765": lname,
+                "entry.1436444388": ptPhone,
+                "entry.128647103": ptAddress,
+                "entry.1838964175": ptCity,
+                "entry.1256466694": ptState,
+                "entry.76096564": ptZip,
+                "entry.947716815": ptDob,
+                "entry.1442211744": medID,
+                "entry.80565363": ptHeight,
+                "entry.1560113764": ptWeight,
+                "entry.848469829": ptGender,
+                "entry.1557749263": drName,
+                "entry.1569206044": drAddress,
+                "entry.752895498": drCity,
+                "entry.2043453995": drState,
+                "entry.146484812": drZip,
+                "entry.1998442715": drPhone,
+                "entry.1096785263": drFax,
+                "entry.1069274004": drNpi,
+            }
 
-            if not selected_urls:
-                st.warning("Please select at least one brace form.")
-            else:
-                for brace_type, url in selected_urls:
-                    form_data = {
-                        "entry.1545087922": date.strftime("%m/%d/%Y"),
-                        "entry.1992907553": fname,
-                        "entry.1517085063": lname,
-                        "entry.1178853697": ptPhone,
-                        "entry.478400313": ptAddress,
-                        "entry.1687085318": ptCity,
-                        "entry.1395966108": ptState,
-                        "entry.1319952523": ptZip,
-                        "entry.1553550428": ptDob,
-                        "entry.1122949100": medID,
-                        "entry.2102408689": ptHeight,
-                        "entry.1278616009": ptWeight,
-                        "entry.1322384700": ptGender,
-                        "entry.2090908898": drName,
-                        "entry.198263517": drAddress,
-                        "entry.1349410133": drCity,
-                        "entry.847367280": drState,
-                        "entry.1652935364": drZip,
-                        "entry.756850883": drPhone,
-                        "entry.1725680069": drFax,
-                        "entry.314880762": drNpi
-                    }
+            submission_results = []
 
-                    encoded_data = urlencode(form_data, quote_via=quote_plus)
-                    full_url = f"{url}?{encoded_data}"
-                    
-                    # Test the URL
-                    try:
-                        response = requests.get(full_url)
+            for brace, form_url in selected_forms.items():
+                if form_url != "None":
+                    if brace in BracesForms and form_url in BracesForms[brace]:
+                        form_url = BracesForms[brace][form_url]
+                        brace_params = {
+                            f"entry.{field_id}": value
+                            for field_id, value in patient_params.items()
+                        }
+                        form_url = f"{form_url}?{urlencode(brace_params, quote_via=quote_plus)}"
+                        response = requests.get(form_url)
                         if response.status_code == 200:
-                            # webbrowser.open(full_url)
-
-                            st.write(f"[Click here to open the form for {brace_type} brace](<{full_url}>)")
+                            submission_results.append(f"{brace} form submitted successfully.")
                         else:
-                            st.error(f"Failed to access the form for {brace_type} brace. Status Code: {response.status_code}")
-                    except Exception as e:
-                        st.error(f"Error accessing the form for {brace_type} brace: {e}")
+                            submission_results.append(f"Failed to submit {brace} form.")
+                    else:
+                        submission_results.append(f"No form URL found for {brace}.")
+            st.success("\n".join(submission_results))
 
-                st.success(f"{len(selected_urls)} form(s) are ready for submission. Please click the links above to submit.")
+            combined_pdf_path, error = combine_pdfs(fname)
+            if error:
+                st.error(error)
+            else:
+                with open(combined_pdf_path, "rb") as f:
+                    combined_pdf_data = f.read()
 
-    st.header("Combine PDFs")
-    doctor_name = st.text_input("Enter Doctor Name for PDF combination")
-    if st.button("Combine PDFs"):
-        if doctor_name:
-            with st.spinner("Combining PDFs..."):
-                combined_pdf_path, error = combine_pdfs(doctor_name)
-                if combined_pdf_path:
-                    st.success(f"PDFs combined successfully. Saved as: {combined_pdf_path}")
-                    with open(combined_pdf_path, "rb") as file:
-                        st.download_button(
-                            label="Download combined PDF",
-                            data=file,
-                            file_name=f"{doctor_name}_combined.pdf",
-                            mime="application/pdf"
-                        )
-                else:
-                    st.error(f"Error combining PDFs: {error}")
-        else:
-            st.warning("Please enter a doctor name for PDF combination.")
+                st.download_button(
+                    label="Download Combined PDF",
+                    data=combined_pdf_data,
+                    file_name=f"{fname}_combined.pdf",
+                    mime="application/pdf"
+                )
+                st.success(f"Combined PDF for {fname} created successfully.")
 
 if __name__ == "__main__":
     main()
