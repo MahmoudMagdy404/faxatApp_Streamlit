@@ -11,11 +11,9 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 from googleapiclient.errors import HttpError
 import os
-from dotenv import load_dotenv
 import json
 
 
-load_dotenv()
 # Define the braces and their forms
 Braces = ["Back", "Knees", "Elbow", "Shoulder", "Ankle", "Wrists"]
 BracesForms = {
