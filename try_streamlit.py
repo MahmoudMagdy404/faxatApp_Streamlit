@@ -166,7 +166,7 @@ def main():
                     try:
                         response = requests.get(full_url)
                         if response.status_code == 200:
-                            webbrowser.open(full_url)
+                            # webbrowser.open(full_url)
 
                             st.write(f"[Click here to open the form for {brace_type} brace](<{full_url}>)")
                         else:
