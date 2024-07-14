@@ -50,11 +50,8 @@ def combine_pdfs(fname):
         logging.info("Starting PDF combination process.")
         SCOPES = ["https://www.googleapis.com/auth/drive"]
         creds = None
-        
-        # Check for token in session state
-        if 'token' in st.session_state:
-            creds = Credentials.from_authorized_user_info(st.session_state['token'], SCOPES)
-        
+        if os.path.exists("token.json"):
+            creds = Credentials.from_authorized_user_file("token.json", SCOPES)
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
                 creds.refresh(Request())
@@ -62,8 +59,8 @@ def combine_pdfs(fname):
                 credentials_json = json.loads(st.secrets["google_credentials"]["credentials_json"])
                 flow = InstalledAppFlow.from_client_config(credentials_json, SCOPES)
                 creds = flow.run_local_server(port=0)
-                # Save the credentials in session state
-                st.session_state['token'] = json.loads(creds.to_json())
+                with open("token.json", "w") as token:
+                    token.write(creds.to_json())
 
         logging.info("Building Google Drive service.")
         service = build("drive", "v3", credentials=creds)
