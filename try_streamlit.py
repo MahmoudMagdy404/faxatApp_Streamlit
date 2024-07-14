@@ -158,9 +158,9 @@ def main():
                     }
 
                     full_url = f"{url}?{urlencode(form_data)}"
-                    webbrowser.open(full_url)
+                    st.write(f"[Click here to open the form for {brace_type} brace](<{full_url}>)")
 
-                st.success(f"{len(selected_urls)} form(s) have been opened in your browser.")
+                st.success(f"{len(selected_urls)} form(s) are ready for submission. Please click the links above to submit.")
 
 if __name__ == "__main__":
     main()
