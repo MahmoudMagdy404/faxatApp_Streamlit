@@ -1,6 +1,7 @@
 import streamlit as st
-from urllib.parse import urlencode
+from urllib.parse import urlencode , quote_plus
 import webbrowser
+import requests
 
 # Define the braces and their forms
 Braces = ["Back", "Knees", "Elbow", "Shoulder", "Ankle", "Wrists"]
@@ -119,6 +120,7 @@ def main():
                 return False
         return True
 
+
     if st.button("Submit"):
         if not validate_all_fields():
             st.warning("Please fill out all required fields.")
@@ -157,10 +159,23 @@ def main():
                         "entry.314880762": drNpi
                     }
 
-                    full_url = f"{url}?{urlencode(form_data)}"
-                    st.write(f"[Click here to open the form for {brace_type} brace](<{full_url}>)")
+                    encoded_data = urlencode(form_data, quote_via=quote_plus)
+                    full_url = f"{url}?{encoded_data}"
+                    
+                    # Test the URL
+                    try:
+                        response = requests.get(full_url)
+                        if response.status_code == 200:
+                            webbrowser.open(full_url)
+
+                            st.write(f"[Click here to open the form for {brace_type} brace](<{full_url}>)")
+                        else:
+                            st.error(f"Failed to access the form for {brace_type} brace. Status Code: {response.status_code}")
+                    except Exception as e:
+                        st.error(f"Error accessing the form for {brace_type} brace: {e}")
 
                 st.success(f"{len(selected_urls)} form(s) are ready for submission. Please click the links above to submit.")
+
 
 if __name__ == "__main__":
     main()
