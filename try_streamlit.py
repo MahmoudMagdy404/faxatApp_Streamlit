@@ -1,7 +1,7 @@
 import streamlit as st
 from urllib.parse import urlencode, quote_plus
 import requests
-from PyPDF2 import PdfMerger
+from PyPDF2 import PdfMerger, PdfReader
 import io
 import re
 from google.auth.transport.requests import Request
@@ -67,6 +67,7 @@ def combine_pdfs(fname):
         if not items:
             return None, "No files found in the specified folder."
 
+        fname = fname.strip()
         target_files = [file for file in items if fname in file["name"]]
 
         if not target_files:
@@ -76,12 +77,9 @@ def combine_pdfs(fname):
         for target_file in target_files:
             mime_type = target_file.get("mimeType")
             file_id = target_file.get("id")
-            file_name = target_file.get("name")
-            sanitized_file_name = sanitize_filename(file_name)
 
             if mime_type.startswith("application/vnd.google-apps."):
-                export_mime_type = "application/pdf"
-                request = service.files().export_media(fileId=file_id, mimeType=export_mime_type)
+                request = service.files().export_media(fileId=file_id, mimeType="application/pdf")
             else:
                 request = service.files().get_media(fileId=file_id)
 
@@ -91,23 +89,15 @@ def combine_pdfs(fname):
             while not done:
                 status, done = downloader.next_chunk()
             fh.seek(0)
-            file_content = fh.read()
+            
+            pdf_reader = PdfReader(fh)
+            merger.append(pdf_reader)
 
-            temp_pdf_path = os.path.join(tempfile.gettempdir(), f"temp_{sanitized_file_name}.pdf")
-            with open(temp_pdf_path, "wb") as f:
-                f.write(file_content)
-
-            with open(temp_pdf_path, "rb") as f:
-                merger.append(f)
-
-            os.remove(temp_pdf_path)
-
-        combined_pdf_path = os.path.join(tempfile.gettempdir(), f"{sanitize_filename(fname)}_combined.pdf")
-        with open(combined_pdf_path, "wb") as f:
-            merger.write(f)
-
+        output = io.BytesIO()
+        merger.write(output)
         merger.close()
-        return combined_pdf_path, None
+        output.seek(0)
+        return output, None
 
     except HttpError as error:
         return None, f"An error occurred: {error}"
@@ -264,23 +254,25 @@ def main():
     if st.button("Combine PDFs"):
         if doctor_name:
             with st.spinner("Combining PDFs..."):
-                combined_pdf_path, error = combine_pdfs(drName)
+                combined_pdf, error = combine_pdfs(doctor_name)
                 if error:
                     st.error(f"Error combining PDFs: {error}")
                 else:
-                    with open(combined_pdf_path, "rb") as f:
-                        combined_pdf_data = f.read()
-
-                    st.download_button(
-                        label="Download Combined PDF",
-                        data=combined_pdf_data,
-                        file_name=f"{drName}_combined.pdf",
-                        mime="application/pdf"
-                    )
-                    st.success(f"Combined PDF for {drName} created successfully.")
-
+                    st.success(f"Combined PDF for {doctor_name} created successfully.")
+                    st.session_state['combined_pdf'] = combined_pdf
+                    st.session_state['doctor_name'] = doctor_name
+                    st.rerun()
         else:
             st.warning("Please enter a doctor name for PDF combination.")
+
+    if 'combined_pdf' in st.session_state:
+        st.download_button(
+            label="Download Combined PDF",
+            data=st.session_state['combined_pdf'].getvalue(),
+            file_name=f"{st.session_state['doctor_name']}_combined.pdf",
+            mime="application/pdf"
+        )
+        st.success("Combined PDF is ready for further processing (e.g., sending faxes).")
 
 if __name__ == "__main__":
     main()
