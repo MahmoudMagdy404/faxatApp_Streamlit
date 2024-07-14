@@ -1,8 +1,21 @@
 import streamlit as st
-from urllib.parse import urlencode , quote_plus
-import webbrowser
+from urllib.parse import urlencode, quote_plus
 import requests
+from PyPDF2 import PdfMerger
+import io
+import re
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseDownload
+from googleapiclient.errors import HttpError
+import os
+from dotenv import load_dotenv
+import json
 
+
+load_dotenv()
 # Define the braces and their forms
 Braces = ["Back", "Knees", "Elbow", "Shoulder", "Ankle", "Wrists"]
 BracesForms = {
@@ -28,6 +41,77 @@ BracesForms = {
         'L3916': 'https://docs.google.com/forms/d/e/1FAIpQLSd4XQox2yt3wsild0InVMgagrcQ9Aors4PjExoOILHiT9grew/formResponse'
     }
 }
+def sanitize_filename(filename):
+    return re.sub(r'[<>:"/\\|?*\x00-\x1F]', '', filename)
+
+def combine_pdfs(fname):
+    try:
+        SCOPES = ["https://www.googleapis.com/auth/drive"]
+        creds = None
+        if os.path.exists("token.json"):
+            creds = Credentials.from_authorized_user_file("token.json", SCOPES)
+        if not creds or not creds.valid:
+            if creds and creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+            else:
+                credentials_json = json.loads(st.secrets["google_credentials"]["credentials_json"])
+                flow = InstalledAppFlow.from_client_config(credentials_json, SCOPES)
+                creds = flow.run_local_server(port=0)
+                with open("token.json", "w") as token:
+                    token.write(creds.to_json())
+
+        service = build("drive", "v3", credentials=creds)
+        folder_id = "15I95Loh35xI2PcGa36xz7SgMtclo-9DC"
+        query = f"'{folder_id}' in parents"
+        results = service.files().list(q=query, pageSize=20, fields="nextPageToken, files(id, name, mimeType)").execute()
+        items = results.get("files", [])
+        if not items:
+            return None, "No files found in the specified folder."
+
+        target_files = [file for file in items if fname in file["name"]]
+
+        if not target_files:
+            return None, "No matching files found."
+
+        merger = PdfMerger()
+        for target_file in target_files:
+            mime_type = target_file.get("mimeType")
+            file_id = target_file.get("id")
+            file_name = target_file.get("name")
+            sanitized_file_name = sanitize_filename(file_name)
+
+            if mime_type.startswith("application/vnd.google-apps."):
+                export_mime_type = "application/pdf"
+                request = service.files().export_media(fileId=file_id, mimeType=export_mime_type)
+            else:
+                request = service.files().get_media(fileId=file_id)
+
+            fh = io.BytesIO()
+            downloader = MediaIoBaseDownload(fh, request)
+            done = False
+            while not done:
+                status, done = downloader.next_chunk()
+            fh.seek(0)
+            file_content = fh.read()
+
+            temp_pdf_path = os.path.join(os.getcwd(), f"temp_{sanitized_file_name}.pdf")
+            with open(temp_pdf_path, "wb") as f:
+                f.write(file_content)
+
+            with open(temp_pdf_path, "rb") as f:
+                merger.append(f)
+
+            os.remove(temp_pdf_path)
+
+        combined_pdf_path = os.path.join(os.getcwd(), f"{sanitize_filename(fname)}_combined.pdf")
+        with open(combined_pdf_path, "wb") as f:
+            merger.write(f)
+
+        merger.close()
+        return combined_pdf_path, None
+
+    except HttpError as error:
+        return None, f"An error occurred: {error}"
 
 def main():
     # st.markdown(
@@ -176,6 +260,25 @@ def main():
 
                 st.success(f"{len(selected_urls)} form(s) are ready for submission. Please click the links above to submit.")
 
+    st.header("Combine PDFs")
+    doctor_name = st.text_input("Enter Doctor Name for PDF combination")
+    if st.button("Combine PDFs"):
+        if doctor_name:
+            with st.spinner("Combining PDFs..."):
+                combined_pdf_path, error = combine_pdfs(doctor_name)
+                if combined_pdf_path:
+                    st.success(f"PDFs combined successfully. Saved as: {combined_pdf_path}")
+                    with open(combined_pdf_path, "rb") as file:
+                        st.download_button(
+                            label="Download combined PDF",
+                            data=file,
+                            file_name=f"{doctor_name}_combined.pdf",
+                            mime="application/pdf"
+                        )
+                else:
+                    st.error(f"Error combining PDFs: {error}")
+        else:
+            st.warning("Please enter a doctor name for PDF combination.")
 
 if __name__ == "__main__":
     main()
