@@ -105,30 +105,6 @@ def combine_pdfs(fname):
         return None, f"An error occurred: {error}"
 
 def main():
-    # st.markdown(
-    #     """
-    #     <style>
-    #     .main {
-    #         background-color: #F3F7EC;
-    #     }
-    #     .css-1v0mbdj {
-    #         background-color: #005C78;
-    #         color: #FFFFFF;
-    #         font-weight: bold;
-    #         padding: 0.75em 1.5em;
-    #         border-radius: 5px;
-    #         text-align: center;
-    #     }
-    #     .css-1v0mbdj:hover {
-    #         background-color: #006989;
-    #     }
-    #     .css-1f1h61n {
-    #         margin: 1em 0;
-    #     }
-    #     </style>
-    #     """, unsafe_allow_html=True
-    # )
-
     st.title("Brace Form Submission")
 
     st.header("Patient and Doctor Information")
@@ -251,40 +227,19 @@ def main():
 
                 st.success(f"{len(selected_urls)} form(s) are ready for submission. Please click the links above to submit.")
 
-    st.header("Combine PDFs")
-    doctor_name = st.text_input("Enter Doctor Name for PDF combination")
-    if st.button("Combine PDFs"):
-        if doctor_name:
-            with st.spinner("Combining PDFs..."):
-                combined_pdf, error = combine_pdfs(doctor_name)
-                if error:
-                    st.error(f"Error combining PDFs: {error}")
-                else:
-                    st.success(f"Combined PDF for {doctor_name} created successfully.")
-                    st.session_state['combined_pdf'] = combined_pdf
-                    st.session_state['doctor_name'] = doctor_name
-                    st.rerun()
-        else:
-            st.warning("Please enter a doctor name for PDF combination.")
-
-    if 'combined_pdf' in st.session_state:
-        st.download_button(
-            label="Download Combined PDF",
-            data=st.session_state['combined_pdf'].getvalue(),
-            file_name=f"{st.session_state['doctor_name']}_combined.pdf",
-            mime="application/pdf"
-        )
-        st.success("Combined PDF is ready for further processing (e.g., sending faxes).")
+                with st.spinner("Combining PDFs..."):
+                    combined_pdf, error = combine_pdfs(drName)
+                    if error:
+                        st.error(f"Error combining PDFs: {error}")
+                    else:
+                        st.success(f"Combined PDF for {drName} created successfully.")
+                        st.session_state['combined_pdf'] = combined_pdf
+                        st.session_state['doctor_name'] = drName
+                        st.rerun()
     
 
     st.header("Send Fax")
     
-    # Common fax inputs
-    fax_message = st.text_area("Fax Message")
-    fax_subject = st.text_input("Fax Subject")
-    to_name = st.text_input("To (Recipient Name)")
-    chaser_name = st.text_input("From (Sender Name)")
-
     # Fax service selection using checkboxes
     st.subheader("Select Fax Services")
     col1, col2 = st.columns(2)
@@ -292,18 +247,26 @@ def main():
         use_srfax = st.checkbox("SRFax")
         use_humblefax = st.checkbox("HumbleFax")
     with col2:
-        use_hellofax = st.checkbox("HelloFax")
+        use_HalloFax = st.checkbox("HalloFax")
         use_faxplus = st.checkbox("FaxPlus")
 
     # Receiver number input
     receiver_number = st.text_input("Receiver Fax Number")
+    
+    # Common fax inputs
+    fax_message = st.text_area("Fax Message")
+    fax_subject = st.text_input("Fax Subject")
+    to_name = st.text_input("To (Recipient Name)")
+    chaser_name = st.text_input("From (Sender Name)")
+
+
 
     if st.button("Send Fax"):
         if not receiver_number:
             st.error("Please enter a receiver fax number.")
         elif 'combined_pdf' not in st.session_state:
             st.error("Please combine PDFs before sending a fax.")
-        elif not any([use_srfax, use_humblefax, use_hellofax, use_faxplus]):
+        elif not any([use_srfax, use_humblefax, use_HalloFax, use_faxplus]):
             st.error("Please select at least one fax service.")
         else:
             combined_pdf = st.session_state['combined_pdf']
@@ -317,9 +280,9 @@ def main():
                 result = handle_humblefax(combined_pdf, receiver_number, fax_message, fax_subject, to_name, chaser_name)
                 results.append(("HumbleFax", result))
 
-            if use_hellofax:
-                result = handle_hellofax(combined_pdf, receiver_number, fax_message, fax_subject, to_name, chaser_name)
-                results.append(("HelloFax", result))
+            if use_HalloFax:
+                result = handle_HalloFax(combined_pdf, receiver_number, fax_message, fax_subject, to_name, chaser_name)
+                results.append(("HalloFax", result))
 
             if use_faxplus:
                 result = handle_faxplus(combined_pdf, receiver_number, fax_message, fax_subject, to_name, chaser_name)
@@ -463,9 +426,9 @@ def handle_humblefax(combined_pdf, receiver, fax_message, fax_subject, to_name, 
         print(f"HTTP Error: {send_response.status_code} - {send_response.text}")
         return False
 
-def handle_hellofax(combined_pdf, receiver, fax_message, fax_subject, to_name, chaser_name):
-    # Implement HelloFax logic here
-    print(f"Sending fax to {receiver} using HelloFax")
+def handle_HalloFax(combined_pdf, receiver, fax_message, fax_subject, to_name, chaser_name):
+    # Implement HalloFax logic here
+    print(f"Sending fax to {receiver} using HalloFax")
     # Use the provided parameters to send the fax
     # Return True if successful, False otherwise
     return True
