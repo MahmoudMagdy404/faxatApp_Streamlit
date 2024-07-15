@@ -13,6 +13,8 @@ from googleapiclient.errors import HttpError
 import os
 import json
 import tempfile
+import base64
+
 
 
 # Define the braces and their forms
@@ -273,8 +275,207 @@ def main():
             mime="application/pdf"
         )
         st.success("Combined PDF is ready for further processing (e.g., sending faxes).")
+    
+
+    st.header("Send Fax")
+    
+    # Common fax inputs
+    fax_message = st.text_area("Fax Message")
+    fax_subject = st.text_input("Fax Subject")
+    to_name = st.text_input("To (Recipient Name)")
+    chaser_name = st.text_input("From (Sender Name)")
+
+    # Fax service selection using checkboxes
+    st.subheader("Select Fax Services")
+    col1, col2 = st.columns(2)
+    with col1:
+        use_srfax = st.checkbox("SRFax")
+        use_humblefax = st.checkbox("HumbleFax")
+    with col2:
+        use_hellofax = st.checkbox("HelloFax")
+        use_faxplus = st.checkbox("FaxPlus")
+
+    # Receiver number input
+    receiver_number = st.text_input("Receiver Fax Number")
+
+    if st.button("Send Fax"):
+        if not receiver_number:
+            st.error("Please enter a receiver fax number.")
+        elif 'combined_pdf' not in st.session_state:
+            st.error("Please combine PDFs before sending a fax.")
+        elif not any([use_srfax, use_humblefax, use_hellofax, use_faxplus]):
+            st.error("Please select at least one fax service.")
+        else:
+            combined_pdf = st.session_state['combined_pdf']
+            results = []
+
+            if use_srfax:
+                result = handle_srfax(combined_pdf, receiver_number, fax_message, fax_subject, to_name, chaser_name)
+                results.append(("SRFax", result))
+
+            if use_humblefax:
+                result = handle_humblefax(combined_pdf, receiver_number, fax_message, fax_subject, to_name, chaser_name)
+                results.append(("HumbleFax", result))
+
+            if use_hellofax:
+                result = handle_hellofax(combined_pdf, receiver_number, fax_message, fax_subject, to_name, chaser_name)
+                results.append(("HelloFax", result))
+
+            if use_faxplus:
+                result = handle_faxplus(combined_pdf, receiver_number, fax_message, fax_subject, to_name, chaser_name)
+                results.append(("FaxPlus", result))
+
+            # Display results
+            for service, success in results:
+                if success:
+                    st.success(f"Fax sent successfully using {service}.")
+                else:
+                    st.error(f"Failed to send fax using {service}. Please check the logs for more information.")
+
+def handle_srfax(combined_pdf, receiver, fax_message, fax_subject, to_name, chaser_name):
+    print(f"Sending fax to {receiver} using SR Fax")
+
+    # API credentials
+    access_id = "362654"
+    access_pwd = "Alvin2024$"
+
+    # Fax details
+    caller_id = "8888516047"
+    sender_email = "Alvin.freeman.italk@gmail.com"
+
+    # Cover page details
+    cp_from_name = chaser_name
+    cp_to_name = to_name
+    cp_subject = fax_subject
+    cp_comments = fax_message
+    cp_organization = "InCall Medical Supplies"
+    cp_from_header = "From InCall Medical Supplies"
+
+    # Encode the PDF file
+    encoded_file = base64.b64encode(combined_pdf.getvalue()).decode()
+
+    # API endpoint
+    url = "https://www.srfax.com/SRF_SecWebSvc.php"
+
+    # Payload
+    payload = {
+        "action": "Queue_Fax",
+        "access_id": access_id,
+        "access_pwd": access_pwd,
+        "sCallerID": caller_id,
+        "sSenderEmail": sender_email,
+        "sFaxType": "SINGLE",
+        "sToFaxNumber": receiver,
+        "sFileName_1": "combined.pdf",
+        "sFileContent_1": encoded_file,
+        "sCoverPage": "Company",
+        "sCPFromName": cp_from_name,
+        "sCPToName": cp_to_name,
+        "sCPOrganization": cp_organization,
+        "sCPSubject": cp_subject,
+        "sCPComments": cp_comments,
+        "sFaxFromHeader": cp_from_header,
+    }
+
+    response = requests.post(url, data=payload)
+
+    if response.status_code == 200:
+        try:
+            response_data = response.json()
+            if response_data.get("Result") == "Success":
+                print("Fax sent successfully")
+                print(f"Fax Details: {response_data}")
+                return True
+            else:
+                print("Failed to send fax")
+                print(f"Error: {response_data.get('Error')}")
+                return False
+        except ValueError as e:
+            print(f"Failed to parse JSON response: {e}")
+            return False
+    else:
+        print(f"HTTP Error: {response.status_code}")
+        return False
+
+def handle_humblefax(combined_pdf, receiver, fax_message, fax_subject, to_name, chaser_name):
+    print(f"Sending fax to {receiver} using HumbleFax")
+
+    access_key = "df95f7caf15a8e5c08235625"
+    secret_key = "1e2751cfb091a2f72a2a273f"
+
+    # Step 1: Create a temporary fax
+    create_tmp_fax_url = "https://api.humblefax.com/tmpFax"
+    headers = {
+        "Authorization": f"Basic {base64.b64encode(f'{access_key}:{secret_key}'.encode()).decode()}"
+    }
+    create_tmp_fax_payload = {
+        "toName": to_name,
+        "recipients": [receiver],
+        "fromName": chaser_name,
+        "subject": fax_subject,
+        "message": fax_message,
+        "includeCoversheet": True,
+        "companyInfo": (
+            "InCall Medical Supplies\n"
+            "Fax 1: +1 (888) 851-6047\n"
+            "Fax 2: +1 (510) 890-3073\n"
+            "Phone: +1 (352) 718-1524"
+        ),
+        "pageSize": "A4",
+        "resolution": "Fine",
+        "fromNumber": "12139056868"
+    }
+
+    create_tmp_fax_response = requests.post(create_tmp_fax_url, headers=headers, json=create_tmp_fax_payload)
+    if create_tmp_fax_response.status_code != 200:
+        print(f"Failed to create temporary fax: {create_tmp_fax_response.text}")
+        return False
+
+    tmp_fax_data = create_tmp_fax_response.json().get("data", {}).get("tmpFax", {})
+    tmp_fax_id = tmp_fax_data.get("id")
+    print(f"tmpFaxId obtained: {tmp_fax_id}")
+
+    # Step 2: Upload the main PDF file
+    files = {'file': ('combined.pdf', combined_pdf.getvalue(), 'application/pdf')}
+    upload_response = requests.post(f'https://api.humblefax.com/attachment/{tmp_fax_id}', headers=headers, files=files)
+    if upload_response.status_code != 200:
+        print(f"Failed to upload main file: {upload_response.text}")
+        return False
+
+    main_file_data = upload_response.json().get("data", {})
+    main_file_id = main_file_data.get("id")
+    print(f"Main file uploaded successfully. File ID: {main_file_id}")
+
+    # Step 3: Send the temporary fax
+    send_fax_url = f"https://api.humblefax.com/tmpFax/{tmp_fax_id}/send"
+    send_response = requests.post(send_fax_url, headers=headers)
+
+    if send_response.status_code == 200:
+        response_data = send_response.json()
+        if response_data.get("result") == "success":
+            fax_id = response_data.get("data", {}).get("id")
+            print(f"Fax sent successfully. Fax ID: {fax_id}")
+            return True
+        else:
+            print(f"Failed to send fax: {response_data.get('message')}")
+            return False
+    else:
+        print(f"HTTP Error: {send_response.status_code} - {send_response.text}")
+        return False
+
+def handle_hellofax(combined_pdf, receiver, fax_message, fax_subject, to_name, chaser_name):
+    # Implement HelloFax logic here
+    print(f"Sending fax to {receiver} using HelloFax")
+    # Use the provided parameters to send the fax
+    # Return True if successful, False otherwise
+    return True
+
+def handle_faxplus(combined_pdf, receiver, fax_message, fax_subject, to_name, chaser_name):
+    # Implement FaxPlus logic here
+    print(f"Sending fax to {receiver} using FaxPlus")
+    # Use the provided parameters to send the fax
+    # Return True if successful, False otherwise
+    return True
 
 if __name__ == "__main__":
     main()
-
-
