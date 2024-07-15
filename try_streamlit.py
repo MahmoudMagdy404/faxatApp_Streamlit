@@ -5,17 +5,21 @@ import requests
 from PyPDF2 import PdfMerger, PdfReader
 import io
 import re
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
+from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
-from googleapiclient.errors import HttpError
-import os
 import json
-import tempfile
 import base64
-
+from google.oauth2 import service_account
+import streamlit as st
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import Flow
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
+from PyPDF2 import PdfMerger, PdfReader
+import io
+import json
+from google.auth.transport.requests import Request
 
 
 # Define the braces and their forms
@@ -207,64 +211,139 @@ def handle_faxplus(combined_pdf, receiver_number, fax_message, fax_subject, to_n
 def sanitize_filename(filename):
     return re.sub(r'[<>:"/\\|?*\x00-\x1F]', '', filename)
 
-def combine_pdfs(fname):
-    try:
-        SCOPES = ["https://www.googleapis.com/auth/drive"]
-        creds = None
-        if os.path.exists("token.json"):
-            creds = Credentials.from_authorized_user_file("token.json", SCOPES)
-        if not creds or not creds.valid:
-            if creds and creds.expired and creds.refresh_token:
-                creds.refresh(Request())
-            else:
-                credentials_json = json.loads(st.secrets["google_credentials"]["credentials_json"])
-                flow = InstalledAppFlow.from_client_config(credentials_json, SCOPES)
-                creds = flow.run_local_server(port=0)
-                with open("token.json", "w") as token:
-                    token.write(creds.to_json())
 
-        service = build("drive", "v3", credentials=creds)
+TOKEN_FOLDER_ID = "1HDwNvgFv_DSEH2WKNfLNheKXxKT_hDM9"
+TOKEN_FILE_NAME = "token.json"
+
+def get_google_auth_flow():
+    client_config = json.loads(st.secrets["google_credentials"]["credentials_json"])
+    flow = Flow.from_client_config(
+        client_config,
+        scopes=["https://www.googleapis.com/auth/drive"],
+        redirect_uri="urn:ietf:wg:oauth:2.0:oob"
+    )
+    return flow
+
+def get_drive_service(creds):
+    return build("drive", "v3", credentials=creds)
+
+def save_token_to_drive(service, token_data):
+    file_metadata = {
+        'name': TOKEN_FILE_NAME,
+        'parents': [TOKEN_FOLDER_ID]
+    }
+    media = MediaIoBaseUpload(io.BytesIO(json.dumps(token_data).encode()), mimetype='application/json')
+    file = service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+
+def load_token_from_drive(service):
+    query = f"name='{TOKEN_FILE_NAME}' and '{TOKEN_FOLDER_ID}' in parents"
+    results = service.files().list(q=query, spaces='drive', fields='files(id, name)').execute()
+    items = results.get('files', [])
+    if items:
+        file_id = items[0]['id']
+        request = service.files().get_media(fileId=file_id)
+        file_content = io.BytesIO()
+        downloader = MediaIoBaseDownload(file_content, request)
+        done = False
+        while done is False:
+            _, done = downloader.next_chunk()
+        return json.loads(file_content.getvalue())
+    return None
+
+def get_credentials():
+    creds = None
+    flow = get_google_auth_flow()
+
+    try:
+        # Try to load existing token
+        service = build("drive", "v3", credentials=Credentials.from_authorized_user_file("temp_token.json"))
+        token_data = load_token_from_drive(service)
+        if token_data:
+            creds = Credentials.from_authorized_user_info(token_data)
+    except Exception as e:
+        st.write(f"Error loading token: {e}")
+
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            auth_url, _ = flow.authorization_url(prompt='consent')
+            st.write(f"Please visit this URL to authorize the application: {auth_url}")
+            auth_code = st.text_input("Enter the authorization code:")
+            if auth_code:
+                flow.fetch_token(code=auth_code)
+                creds = flow.credentials
+            else:
+                return None  # Return None if no auth code is provided
+
+    if creds and creds.valid:
+        # Save the new token
+        token_data = json.loads(creds.to_json())
+        service = get_drive_service(creds)
+        save_token_to_drive(service, token_data)
+        return creds
+    else:
+        return None  # Return None if we couldn't get valid credentials
+
+def combine_pdfs(fname):
+    creds = get_credentials()
+    if not creds:
+        return None, "Failed to obtain valid credentials. Please try authenticating again."
+
+    try:
+        service = get_drive_service(creds)
         folder_id = "15I95Loh35xI2PcGa36xz7SgMtclo-9DC"
         query = f"'{folder_id}' in parents"
+        
+        st.write("Querying Google Drive...")
         results = service.files().list(q=query, pageSize=20, fields="nextPageToken, files(id, name, mimeType)").execute()
         items = results.get("files", [])
+        
         if not items:
             return None, "No files found in the specified folder."
-
+        
         fname = fname.strip()
         target_files = [file for file in items if fname in file["name"]]
-
+        
         if not target_files:
             return None, "No matching files found."
-
+        
+        st.write(f"Found {len(target_files)} matching files. Combining PDFs...")
+        
         merger = PdfMerger()
         for target_file in target_files:
             mime_type = target_file.get("mimeType")
             file_id = target_file.get("id")
-
+            
+            st.write(f"Processing file: {target_file['name']}")
+            
             if mime_type.startswith("application/vnd.google-apps."):
                 request = service.files().export_media(fileId=file_id, mimeType="application/pdf")
             else:
                 request = service.files().get_media(fileId=file_id)
-
+            
             fh = io.BytesIO()
             downloader = MediaIoBaseDownload(fh, request)
             done = False
             while not done:
                 status, done = downloader.next_chunk()
+                st.write(f"Download {int(status.progress() * 100)}%")
             fh.seek(0)
             
             pdf_reader = PdfReader(fh)
             merger.append(pdf_reader)
-
+        
+        st.write("Finalizing PDF...")
         output = io.BytesIO()
         merger.write(output)
         merger.close()
         output.seek(0)
+        st.write("PDF combination complete!")
         return output, None
+    except Exception as error:
+        st.error(f"An error occurred: {str(error)}")
+        return None, str(error)
 
-    except HttpError as error:
-        return None, f"An error occurred: {error}"
 
 def main():
     st.title("Brace Form Submission")
@@ -399,11 +478,13 @@ def main():
                 combined_pdf, error = combine_pdfs(doctor_name)
                 if error:
                     st.error(f"Error combining PDFs: {error}")
-                else:
+                elif combined_pdf:
                     st.success(f"Combined PDF for {doctor_name} created successfully.")
                     st.session_state['combined_pdf'] = combined_pdf
                     st.session_state['doctor_name'] = doctor_name
                     st.rerun()
+                else:
+                    st.error("Failed to create combined PDF. Please try again.")
         else:
             st.warning("Please enter a doctor name for PDF combination.")
 
