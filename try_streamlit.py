@@ -21,6 +21,10 @@ from PyPDF2 import PdfMerger, PdfReader
 import io
 import json
 from google.auth.transport.requests import Request
+import dropbox
+from dropbox.exceptions import AuthError
+from dropbox.files import WriteMode
+from google_auth_oauthlib.flow import InstalledAppFlow
 
 
 # Define the braces and their forms
@@ -213,62 +217,70 @@ def sanitize_filename(filename):
     return re.sub(r'[<>:"/\\|?*\x00-\x1F]', '', filename)
 
 
-TOKEN_FILE_NAME = "token.json"
+
+# Dropbox settings
+DROPBOX_ACCESS_TOKEN = st.secrets["dropbox"]["access_token"]
+TOKEN_FOLDER_PATH = '/Apps/faxat app'
+TOKEN_FILE_NAME = 'token.json'
+
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 
-def get_google_auth_flow():
-    client_config = json.loads(st.secrets["google_credentials"]["credentials_json"])
-    flow = Flow.from_client_config(
-        client_config,
-        scopes=SCOPES,
-        redirect_uri="urn:ietf:wg:oauth:2.0:oob"
-    )
-    return flow
+def get_dropbox_client():
+    return dropbox.Dropbox(DROPBOX_ACCESS_TOKEN)
 
-def get_drive_service(creds):
-    return build("drive", "v3", credentials=creds)
+def download_token_from_dropbox():
+    client = get_dropbox_client()
+    try:
+        # Download the token from Dropbox
+        metadata, response = client.files_download(f'{TOKEN_FOLDER_PATH}/{TOKEN_FILE_NAME}')
+        with open(TOKEN_FILE_NAME, 'wb') as f:
+            f.write(response.content)
+        print('Token downloaded from Dropbox successfully!')
+    except AuthError as e:
+        print(f'Error downloading token: {e}')
+    except dropbox.exceptions.ApiError as e:
+        print(f'File not found: {e}')
 
-def save_token_to_file(token_data):
-    with open(TOKEN_FILE_NAME, 'w') as token_file:
-        json.dump(token_data, token_file)
-
-def load_token_from_file():
-    if os.path.exists(TOKEN_FILE_NAME):
-        with open(TOKEN_FILE_NAME, 'r') as token_file:
-            token_data = json.load(token_file)
-            return token_data
-    return None
+def upload_token_to_dropbox():
+    client = get_dropbox_client()
+    try:
+        with open(TOKEN_FILE_NAME, 'rb') as f:
+            token_data = f.read()
+        # Upload token to Dropbox
+        client.files_upload(token_data, f'{TOKEN_FOLDER_PATH}/{TOKEN_FILE_NAME}', mode=WriteMode('overwrite'))
+        print('Token uploaded to Dropbox successfully!')
+    except AuthError as e:
+        print(f'Error uploading token: {e}')
 
 def get_credentials():
     creds = None
-    flow = get_google_auth_flow()
 
-    try:
-        token_data = load_token_from_file()
-        if token_data:
-            creds = Credentials.from_authorized_user_info(token_data)
-    except Exception as e:
-        st.write(f"Error loading token: {e}")
+    # Download token from Dropbox if it exists
+    download_token_from_dropbox()
 
+    if os.path.exists(TOKEN_FILE_NAME):
+        creds = Credentials.from_authorized_user_file(TOKEN_FILE_NAME, SCOPES)
+    
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            auth_url, _ = flow.authorization_url(prompt='consent')
-            st.write(f"Please visit this URL to authorize the application: {auth_url}")
-            auth_code = st.text_input("Enter the authorization code:")
-            if auth_code:
-                flow.fetch_token(code=auth_code)
-                creds = flow.credentials
-            else:
-                return None
+            credentials_json = st.secrets["google_credentials"]["credentials_json"]
+            with open('credentials.json', 'w') as f:
+                f.write(credentials_json)
+                
+            flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
+            creds = flow.run_local_server(port=0)
+            with open(TOKEN_FILE_NAME, 'w') as token:
+                token.write(creds.to_json())
+            
+            # Upload the new token to Dropbox
+            upload_token_to_dropbox()
 
-    if creds and creds.valid:
-        token_data = json.loads(creds.to_json())
-        save_token_to_file(token_data)
-        return creds
-    else:
-        return None
+    return creds
+
+def get_drive_service(creds):
+    return build("drive", "v3", credentials=creds)
 
 def combine_pdfs(fname):
     creds = get_credentials()
@@ -328,7 +340,6 @@ def combine_pdfs(fname):
     except Exception as error:
         st.error(f"An error occurred: {str(error)}")
         return None, str(error)
-
 
 def main():
     st.title("Brace Form Submission")
