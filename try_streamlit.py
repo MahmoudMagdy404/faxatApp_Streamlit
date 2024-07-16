@@ -1,3 +1,4 @@
+import os
 import time
 import streamlit as st
 from urllib.parse import urlencode, quote_plus
@@ -212,14 +213,14 @@ def sanitize_filename(filename):
     return re.sub(r'[<>:"/\\|?*\x00-\x1F]', '', filename)
 
 
-TOKEN_FOLDER_ID = "1HDwNvgFv_DSEH2WKNfLNheKXxKT_hDM9"
 TOKEN_FILE_NAME = "token.json"
+SCOPES = ["https://www.googleapis.com/auth/drive"]
 
 def get_google_auth_flow():
     client_config = json.loads(st.secrets["google_credentials"]["credentials_json"])
     flow = Flow.from_client_config(
         client_config,
-        scopes=["https://www.googleapis.com/auth/drive"],
+        scopes=SCOPES,
         redirect_uri="urn:ietf:wg:oauth:2.0:oob"
     )
     return flow
@@ -227,27 +228,15 @@ def get_google_auth_flow():
 def get_drive_service(creds):
     return build("drive", "v3", credentials=creds)
 
-def save_token_to_drive(service, token_data):
-    file_metadata = {
-        'name': TOKEN_FILE_NAME,
-        'parents': [TOKEN_FOLDER_ID]
-    }
-    media = MediaIoBaseUpload(io.BytesIO(json.dumps(token_data).encode()), mimetype='application/json')
-    file = service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+def save_token_to_file(token_data):
+    with open(TOKEN_FILE_NAME, 'w') as token_file:
+        json.dump(token_data, token_file)
 
-def load_token_from_drive(service):
-    query = f"name='{TOKEN_FILE_NAME}' and '{TOKEN_FOLDER_ID}' in parents"
-    results = service.files().list(q=query, spaces='drive', fields='files(id, name)').execute()
-    items = results.get('files', [])
-    if items:
-        file_id = items[0]['id']
-        request = service.files().get_media(fileId=file_id)
-        file_content = io.BytesIO()
-        downloader = MediaIoBaseDownload(file_content, request)
-        done = False
-        while done is False:
-            _, done = downloader.next_chunk()
-        return json.loads(file_content.getvalue())
+def load_token_from_file():
+    if os.path.exists(TOKEN_FILE_NAME):
+        with open(TOKEN_FILE_NAME, 'r') as token_file:
+            token_data = json.load(token_file)
+            return token_data
     return None
 
 def get_credentials():
@@ -255,9 +244,7 @@ def get_credentials():
     flow = get_google_auth_flow()
 
     try:
-        # Try to load existing token
-        service = build("drive", "v3", credentials=Credentials.from_authorized_user_file("temp_token.json"))
-        token_data = load_token_from_drive(service)
+        token_data = load_token_from_file()
         if token_data:
             creds = Credentials.from_authorized_user_info(token_data)
     except Exception as e:
@@ -274,16 +261,14 @@ def get_credentials():
                 flow.fetch_token(code=auth_code)
                 creds = flow.credentials
             else:
-                return None  # Return None if no auth code is provided
+                return None
 
     if creds and creds.valid:
-        # Save the new token
         token_data = json.loads(creds.to_json())
-        service = get_drive_service(creds)
-        save_token_to_drive(service, token_data)
+        save_token_to_file(token_data)
         return creds
     else:
-        return None  # Return None if we couldn't get valid credentials
+        return None
 
 def combine_pdfs(fname):
     creds = get_credentials()
