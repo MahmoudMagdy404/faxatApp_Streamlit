@@ -218,7 +218,7 @@ def sanitize_filename(filename):
 
 # Dropbox settings
 DROPBOX_ACCESS_TOKEN = st.secrets["dropbox"]["access_token"]
-TOKEN_FOLDER_PATH = '/Apps/faxat app'
+TOKEN_FOLDER_PATH = '/Apps/faxat app' 
 TOKEN_FILE_NAME = 'token.json'
 
 SCOPES = ["https://www.googleapis.com/auth/drive"]
