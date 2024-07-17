@@ -482,7 +482,7 @@ def main():
                     st.success(f"Combined PDF for {doctor_name} created successfully.")
                     st.session_state['combined_pdf'] = combined_pdf
                     st.session_state['doctor_name'] = doctor_name
-                    st.rerun()
+                    st.experimental_rerun()
                 else:
                     st.error("Failed to create combined PDF. Please try again.")
         else:
