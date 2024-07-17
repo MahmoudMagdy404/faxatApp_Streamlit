@@ -224,7 +224,13 @@ TOKEN_FILE_NAME = 'token.json'
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 
 def get_dropbox_client():
-    return dropbox.Dropbox(DROPBOX_ACCESS_TOKEN)
+    try:
+        client = dropbox.Dropbox(DROPBOX_ACCESS_TOKEN)
+        client.users_get_current_account()
+        return client
+    except dropbox.exceptions.AuthError:
+        st.error("Dropbox authentication error. Please check your access token.")
+        return None
 
 def download_token_from_dropbox():
     client = get_dropbox_client()
@@ -245,7 +251,7 @@ def upload_token_to_dropbox():
         with open(TOKEN_FILE_NAME, 'rb') as f:
             token_data = f.read()
         # Upload token to Dropbox
-        client.files_upload(token_data, f'{TOKEN_FOLDER_PATH}/{TOKEN_FILE_NAME}', mode=WriteMode('overwrite'))
+        client.files_upload(token_data, f'{TOKEN_FOLDER_PATH}/{TOKEN_FILE_NAME}', mode=dropbox.files.WriteMode('overwrite'))
         print('Token uploaded to Dropbox successfully!')
     except AuthError as e:
         print(f'Error uploading token: {e}')
