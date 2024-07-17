@@ -25,7 +25,6 @@ from dropbox.exceptions import AuthError
 from dropbox.files import WriteMode
 from google_auth_oauthlib.flow import InstalledAppFlow
 
-
 # Define the braces and their forms
 Braces = ["Back", "Knees", "Elbow", "Shoulder", "Ankle", "Wrists"]
 BracesForms = {
@@ -388,216 +387,7 @@ def combine_pdfs(fname):
         st.error(f"An error occurred: {str(error)}")
         return None, str(error)
 
-def main():
-    st.title("Brace Form Submission")
-
-    st.header("Patient and Doctor Information")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.subheader("Patient Information")
-        date = st.date_input("Date")
-        fname = st.text_input("First Name")
-        lname = st.text_input("Last Name")
-        ptPhone = st.text_input("Patient Phone Number")
-        ptAddress = st.text_input("Patient Address")
-        ptCity = st.text_input("Patient City")
-        ptState = st.text_input("Patient State")
-        ptZip = st.text_input("Patient Zip Code")
-        ptDob = st.text_input("Date of Birth")
-        medID = st.text_input("MBI")
-        ptHeight = st.text_input("Height")
-        ptWeight = st.text_input("Weight")
-        ptGender = st.selectbox("Gender", ["Male", "Female", "Other"])
-
-    with col2:
-        st.subheader("Doctor Information")
-        drName = st.text_input("Doctor Name")
-        drAddress = st.text_input("Doctor Address")
-        drCity = st.text_input("Doctor City")
-        drState = st.text_input("Doctor State")
-        drZip = st.text_input("Doctor Zip Code")
-        drPhone = st.text_input("Doctor Phone Number")
-        drFax = st.text_input("Doctor Fax Number")
-        drNpi = st.text_input("Doctor NPI")
-
-    st.header("Select Braces")
-
-    brace_columns = st.columns(len(Braces))
-    selected_forms = {}
-
-    for idx, brace in enumerate(Braces):
-        if brace not in st.session_state:
-            st.session_state[brace] = "None"
-
-        with brace_columns[idx]:
-            st.subheader(f"{brace} Brace")
-            brace_options = ["None"] + list(BracesForms[brace].keys())
-            selected_forms[brace] = st.radio(
-                f"Select {brace} Brace Type",
-                brace_options,
-                key=brace,
-                index=brace_options.index(st.session_state[brace])
-            )
-
-    def validate_all_fields():
-        required_fields = [
-            fname, lname, ptPhone, ptAddress,
-            ptCity, ptState, ptZip, ptDob, medID,
-            ptHeight, ptWeight, drName,
-            drAddress, drCity, drState, drZip,
-            drPhone, drFax, drNpi
-        ]
-        for field in required_fields:
-            if not field:
-                st.warning(f"{field} is required.")
-                return False
-        return True
-
-
-    if st.button("Submit"):
-        if not validate_all_fields():
-            st.warning("Please fill out all required fields.")
-        else:
-            selected_urls = []
-            for brace_type, brace_code in selected_forms.items():
-                if brace_code != "None":
-                    url = BracesForms[brace_type][brace_code]
-                    selected_urls.append((brace_type, url))
-
-            if not selected_urls:
-                st.warning("Please select at least one brace form.")
-            else:
-                for brace_type, url in selected_urls:
-                    form_data = {
-                        "entry.1545087922": date.strftime("%m/%d/%Y"),
-                        "entry.1992907553": fname,
-                        "entry.1517085063": lname,
-                        "entry.1178853697": ptPhone,
-                        "entry.478400313": ptAddress,
-                        "entry.1687085318": ptCity,
-                        "entry.1395966108": ptState,
-                        "entry.1319952523": ptZip,
-                        "entry.1553550428": ptDob,
-                        "entry.1122949100": medID,
-                        "entry.2102408689": ptHeight,
-                        "entry.1278616009": ptWeight,
-                        "entry.1322384700": ptGender,
-                        "entry.2090908898": drName,
-                        "entry.198263517": drAddress,
-                        "entry.1349410133": drCity,
-                        "entry.847367280": drState,
-                        "entry.1652935364": drZip,
-                        "entry.756850883": drPhone,
-                        "entry.1725680069": drFax,
-                        "entry.314880762": drNpi
-                    }
-
-                    encoded_data = urlencode(form_data, quote_via=quote_plus)
-                    full_url = f"{url}?{encoded_data}"
-                    
-                    # Test the URL
-                    try:
-                        response = requests.get(full_url)
-                        if response.status_code == 200:
-                            # webbrowser.open(full_url)
-
-                            st.write(f"[Click here to open the form for {brace_type} brace](<{full_url}>)")
-                        else:
-                            st.error(f"Failed to access the form for {brace_type} brace. Status Code: {response.status_code}")
-                    except Exception as e:
-                        st.error(f"Error accessing the form for {brace_type} brace: {e}")
-
-                st.success(f"{len(selected_urls)} form(s) are ready for submission. Please click the links above to submit.")
-
-    st.header("Combine PDFs")
-    uploaded_cover_sheet = st.file_uploader("Upload Cover Sheet PDF (Optional)", type="pdf")
-
-    doctor_name = st.text_input("Enter Doctor Name for PDF combination")
-    if st.button("Combine PDFs"):
-        if doctor_name:
-            with st.spinner("Combining PDFs..."):
-                combined_pdf, error = combine_pdfs(doctor_name)
-                if error:
-                    st.error(f"Error combining PDFs: {error}")
-                elif combined_pdf:
-                    st.success(f"Combined PDF for {doctor_name} created successfully.")
-                    st.session_state['combined_pdf'] = combined_pdf
-                    st.session_state['doctor_name'] = doctor_name
-                    st.experimental_rerun()
-                else:
-                    st.error("Failed to create combined PDF. Please try again.")
-        else:
-            st.warning("Please enter a doctor name for PDF combination.")
-
-    if 'combined_pdf' in st.session_state:
-        st.download_button(
-            label="Download Combined PDF",
-            data=st.session_state['combined_pdf'].getvalue(),
-            file_name=f"{st.session_state['doctor_name']}_combined.pdf",
-            mime="application/pdf"
-        )
-        st.success("Combined PDF is ready for further processing (e.g., sending faxes).")
-
-    st.header("Send Fax")
-
-    # Fax service selection using checkboxes
-    st.subheader("Select Fax Services")
-    col1, col2 = st.columns(2)
-    with col1:
-        use_srfax = st.checkbox("SRFax")
-        use_humblefax = st.checkbox("HumbleFax")
-    with col2:
-        use_hallofax = st.checkbox("HalloFax")
-        use_faxplus = st.checkbox("FaxPlus")
-
-    # Receiver number input
-    receiver_number = st.text_input("Receiver Fax Number")
-
-    # Common fax inputs
-    fax_message = st.text_area("Fax Message")
-    fax_subject = st.text_input("Fax Subject")
-    to_name = st.text_input("To (Recipient Name)")
-    chaser_name = st.text_input("From (Sender Name)")
-
-
-
-
-    if st.button("Send Fax"):
-        if not receiver_number:
-            st.error("Please enter a receiver fax number.")
-        elif 'combined_pdf' not in st.session_state:
-            st.error("Please combine PDFs before sending a fax.")
-        elif not any([use_srfax, use_humblefax, use_hallofax, use_faxplus]):
-            st.error("Please select at least one fax service.")
-        else:
-            combined_pdf = st.session_state['combined_pdf']
-            results = []
-
-            if use_srfax:
-                result = handle_srfax(combined_pdf, receiver_number, fax_message, fax_subject, to_name, chaser_name, uploaded_cover_sheet)
-                results.append(("SRFax", result))
-
-            if use_humblefax:
-                result = handle_humblefax(combined_pdf, receiver_number, fax_message, fax_subject, to_name, chaser_name, uploaded_cover_sheet)
-                results.append(("HumbleFax", result))
-
-            if use_hallofax:
-                result = handle_hallofax(combined_pdf, receiver_number, fax_message, fax_subject, to_name, chaser_name, uploaded_cover_sheet)
-                results.append(("HalloFax", result))
-
-            if use_faxplus:
-                result = handle_faxplus(combined_pdf, receiver_number, fax_message, fax_subject, to_name, chaser_name, uploaded_cover_sheet)
-                results.append(("FaxPlus", result))
-
-            # Display results
-            for service, success in results:
-                if success:
-                    st.success(f"Fax sent successfully using {service}.")
-                else:
-                    st.error(f"Failed to send fax using {service}. Please check the logs for more information.")
-                    
+    st.title("List Sent Faxes")
                     
     st.header("Refax Option")
     if st.button("List Sent Faxes"):
@@ -640,6 +430,263 @@ def main():
                 if result and result['Status'] == 'Success':
                     st.success("Fax resent successfully!")
                 else:
-                    st.error("Failed to resend fax. Please try again.")                    
+                    st.error("Failed to resend fax. Please try again.")  
+def main():
+    # Sidebar navigation
+    st.sidebar.title("Navigation")
+    page = st.sidebar.radio("Go to", ["Form Submission", "Send Fax", "Sent Faxes List"])
+
+    if page == "Form Submission":
+        st.title("Brace Form Submission")
+        
+        st.header("Patient and Doctor Information")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("Patient Information")
+            date = st.date_input("Date")
+            fname = st.text_input("First Name")
+            lname = st.text_input("Last Name")
+            ptPhone = st.text_input("Patient Phone Number")
+            ptAddress = st.text_input("Patient Address")
+            ptCity = st.text_input("Patient City")
+            ptState = st.text_input("Patient State")
+            ptZip = st.text_input("Patient Zip Code")
+            ptDob = st.text_input("Date of Birth")
+            medID = st.text_input("MBI")
+            ptHeight = st.text_input("Height")
+            ptWeight = st.text_input("Weight")
+            ptGender = st.selectbox("Gender", ["Male", "Female", "Other"])
+
+        with col2:
+            st.subheader("Doctor Information")
+            drName = st.text_input("Doctor Name")
+            drAddress = st.text_input("Doctor Address")
+            drCity = st.text_input("Doctor City")
+            drState = st.text_input("Doctor State")
+            drZip = st.text_input("Doctor Zip Code")
+            drPhone = st.text_input("Doctor Phone Number")
+            drFax = st.text_input("Doctor Fax Number")
+            drNpi = st.text_input("Doctor NPI")
+
+        st.header("Select Braces")
+        brace_columns = st.columns(len(Braces))
+        selected_forms = {}
+
+        for idx, brace in enumerate(Braces):
+            if brace not in st.session_state:
+                st.session_state[brace] = "None"
+
+            with brace_columns[idx]:
+                st.subheader(f"{brace} Brace")
+                brace_options = ["None"] + list(BracesForms[brace].keys())
+                selected_forms[brace] = st.radio(
+                    f"Select {brace} Brace Type",
+                    brace_options,
+                    key=brace,
+                    index=brace_options.index(st.session_state[brace])
+                )
+
+        def validate_all_fields():
+            required_fields = [
+                fname, lname, ptPhone, ptAddress,
+                ptCity, ptState, ptZip, ptDob, medID,
+                ptHeight, ptWeight, drName,
+                drAddress, drCity, drState, drZip,
+                drPhone, drFax, drNpi
+            ]
+            for field in required_fields:
+                if not field:
+                    st.warning(f"{field} is required.")
+                    return False
+            return True
+
+        if st.button("Submit"):
+            if not validate_all_fields():
+                st.warning("Please fill out all required fields.")
+            else:
+                selected_urls = []
+                for brace_type, brace_code in selected_forms.items():
+                    if brace_code != "None":
+                        url = BracesForms[brace_type][brace_code]
+                        selected_urls.append((brace_type, url))
+
+                if not selected_urls:
+                    st.warning("Please select at least one brace form.")
+                else:
+                    for brace_type, url in selected_urls:
+                        form_data = {
+                            "entry.1545087922": date.strftime("%m/%d/%Y"),
+                            "entry.1992907553": fname,
+                            "entry.1517085063": lname,
+                            "entry.1178853697": ptPhone,
+                            "entry.478400313": ptAddress,
+                            "entry.1687085318": ptCity,
+                            "entry.1395966108": ptState,
+                            "entry.1319952523": ptZip,
+                            "entry.1553550428": ptDob,
+                            "entry.1122949100": medID,
+                            "entry.2102408689": ptHeight,
+                            "entry.1278616009": ptWeight,
+                            "entry.1322384700": ptGender,
+                            "entry.2090908898": drName,
+                            "entry.198263517": drAddress,
+                            "entry.1349410133": drCity,
+                            "entry.847367280": drState,
+                            "entry.1652935364": drZip,
+                            "entry.756850883": drPhone,
+                            "entry.1725680069": drFax,
+                            "entry.314880762": drNpi
+                        }
+
+                        encoded_data = urlencode(form_data, quote_via=quote_plus)
+                        full_url = f"{url}?{encoded_data}"
+                        
+                        # Test the URL
+                        try:
+                            response = requests.get(full_url)
+                            if response.status_code == 200:
+                                # webbrowser.open(full_url)
+
+                                st.write(f"[Click here to open the form for {brace_type} brace](<{full_url}>)")
+                            else:
+                                st.error(f"Failed to access the form for {brace_type} brace. Status Code: {response.status_code}")
+                        except Exception as e:
+                            st.error(f"Error accessing the form for {brace_type} brace: {e}")
+
+                    st.success(f"{len(selected_urls)} form(s) are ready for submission. Please click the links above to submit.")
+
+        st.header("Combine PDFs")
+        uploaded_cover_sheet = st.file_uploader("Upload Cover Sheet PDF (Optional)", type="pdf")
+
+        doctor_name = st.text_input("Enter Doctor Name for PDF combination")
+        if st.button("Combine PDFs"):
+            if doctor_name:
+                with st.spinner("Combining PDFs..."):
+                    combined_pdf, error = combine_pdfs(doctor_name)
+                    if error:
+                        st.error(f"Error combining PDFs: {error}")
+                    elif combined_pdf:
+                        st.success(f"Combined PDF for {doctor_name} created successfully.")
+                        st.session_state['combined_pdf'] = combined_pdf
+                        st.session_state['doctor_name'] = doctor_name
+                        st.experimental_rerun()
+                    else:
+                        st.error("Failed to create combined PDF. Please try again.")
+            else:
+                st.warning("Please enter a doctor name for PDF combination.")
+
+        if 'combined_pdf' in st.session_state:
+            st.download_button(
+                label="Download Combined PDF",
+                data=st.session_state['combined_pdf'].getvalue(),
+                file_name=f"{st.session_state['doctor_name']}_combined.pdf",
+                mime="application/pdf"
+            )
+            st.success("Combined PDF is ready for further processing (e.g., sending faxes).")
+
+    elif page == "Send Fax":
+        st.title("Send Fax")
+
+        st.header("Send Fax")
+
+        # Fax service selection using checkboxes
+        st.subheader("Select Fax Services")
+        col1, col2 = st.columns(2)
+        with col1:
+            use_srfax = st.checkbox("SRFax")
+            use_humblefax = st.checkbox("HumbleFax")
+        with col2:
+            use_hallofax = st.checkbox("HalloFax")
+            use_faxplus = st.checkbox("FaxPlus")
+
+        # Receiver number input
+        receiver_number = st.text_input("Receiver Fax Number")
+
+        # Common fax inputs
+        fax_message = st.text_area("Fax Message")
+        fax_subject = st.text_input("Fax Subject")
+        to_name = st.text_input("To (Recipient Name)")
+        chaser_name = st.text_input("From (Sender Name)")
+
+        if st.button("Send Fax"):
+            if not receiver_number:
+                st.error("Please enter a receiver fax number.")
+            elif 'combined_pdf' not in st.session_state:
+                st.error("Please combine PDFs before sending a fax.")
+            elif not any([use_srfax, use_humblefax, use_hallofax, use_faxplus]):
+                st.error("Please select at least one fax service.")
+            else:
+                combined_pdf = st.session_state['combined_pdf']
+                results = []
+
+                if use_srfax:
+                    result = handle_srfax(combined_pdf, receiver_number, fax_message, fax_subject, to_name, chaser_name, uploaded_cover_sheet)
+                    results.append(("SRFax", result))
+
+                if use_humblefax:
+                    result = handle_humblefax(combined_pdf, receiver_number, fax_message, fax_subject, to_name, chaser_name, uploaded_cover_sheet)
+                    results.append(("HumbleFax", result))
+
+                if use_hallofax:
+                    result = handle_hallofax(combined_pdf, receiver_number, fax_message, fax_subject, to_name, chaser_name, uploaded_cover_sheet)
+                    results.append(("HalloFax", result))
+
+                if use_faxplus:
+                    result = handle_faxplus(combined_pdf, receiver_number, fax_message, fax_subject, to_name, chaser_name, uploaded_cover_sheet)
+                    results.append(("FaxPlus", result))
+
+                # Display results
+                for service, success in results:
+                    if success:
+                        st.success(f"Fax sent successfully using {service}.")
+                    else:
+                        st.error(f"Failed to send fax using {service}. Please check the logs for more information.")
+
+    elif page == "Sent Faxes List":
+        st.title("Sent Faxes List")
+
+        st.header("Refax Option")
+        if st.button("List Sent Faxes"):
+            outbox = get_srfax_outbox()
+            if outbox and outbox['Status'] == 'Success':
+                faxes = outbox['Result']
+                
+                # Create a DataFrame from the faxes data
+                df = pd.DataFrame(faxes)
+                df = df[['ToFaxNumber', 'DateSent', 'SentStatus', 'FileName']]  # Include FileName for resending
+                df.columns = ['To', 'Date', 'Status', 'FileName']  # Rename columns for display
+                
+                # Store the DataFrame in session state for later use
+                st.session_state['faxes_df'] = df
+                st.session_state['selected_fax_index'] = None
+                st.session_state['selected_fax_info'] = "No fax selected"
+
+        if 'faxes_df' in st.session_state:
+            # Display the DataFrame with selectable rows
+            selected_df = st.data_editor(
+                st.session_state['faxes_df'].drop(columns=['FileName']),
+                hide_index=True,
+                disabled=["To", "Date", "Status"],
+                use_container_width=True,
+                height=300,
+                num_rows="dynamic",
+                key="selectable_df",
+                on_change=on_row_select
+            )
+            
+            # Display the selected fax information
+            st.write(st.session_state['selected_fax_info'])
+            
+            # Check if any row is selected
+            if st.session_state['selected_fax_index'] is not None:
+                if st.button("Resend Selected Fax"):
+                    selected_fax = st.session_state['faxes_df'].iloc[st.session_state['selected_fax_index']]
+                    result = resend_srfax(selected_fax['FileName'])
+                    if result and result['Status'] == 'Success':
+                        st.success("Fax resent successfully!")
+                    else:
+                        st.error("Failed to resend fax. Please try again.")
+
 if __name__ == "__main__":
     main()
