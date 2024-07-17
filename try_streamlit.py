@@ -1,5 +1,6 @@
 import os
 import time
+import pandas as pd
 import streamlit as st
 from urllib.parse import urlencode, quote_plus
 import requests
@@ -214,7 +215,49 @@ def handle_faxplus(combined_pdf, receiver_number, fax_message, fax_subject, to_n
 def sanitize_filename(filename):
     return re.sub(r'[<>:"/\\|?*\x00-\x1F]', '', filename)
 
-
+def get_srfax_outbox():
+    access_id = "362654"
+    access_pwd = "Alvin2024$"
+    
+    url = "https://www.srfax.com/SRF_SecWebSvc.php"
+    payload = {
+        "action": "Get_Fax_Outbox",
+        "access_id": access_id,
+        "access_pwd": access_pwd,
+        "sResponseFormat": "JSON",
+        "sPeriod": "ALL",
+        "sIncludeSubUsers": "Y"
+    }
+    
+    response = requests.post(url, data=payload)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        return None
+    
+def resend_srfax(fax_id):
+    access_id = "362654"
+    access_pwd = "Alvin2024$"
+    
+    url = "https://www.srfax.com/SRF_SecWebSvc.php"
+    payload = {
+        "action": "Resend_Fax",
+        "access_id": access_id,
+        "access_pwd": access_pwd,
+        "sFaxDetailsID": fax_id
+    }
+    
+    response = requests.post(url, data=payload)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        return None
+def on_row_select():
+    if 'selected_fax_index' in st.session_state and st.session_state['selected_fax_index'] is not None:
+        selected_fax = st.session_state['faxes_df'].iloc[st.session_state['selected_fax_index']]
+        st.session_state['selected_fax_info'] = f"Selected fax: To {selected_fax['To']} sent on {selected_fax['Date']}"
+    else:
+        st.session_state['selected_fax_info'] = "No fax selected"
 
 # Dropbox settings
 DROPBOX_ACCESS_TOKEN = st.secrets["dropbox"]["access_token"]
@@ -554,6 +597,48 @@ def main():
                     st.success(f"Fax sent successfully using {service}.")
                 else:
                     st.error(f"Failed to send fax using {service}. Please check the logs for more information.")
-                
+                    
+                    
+    st.header("Refax Option")
+    if st.button("List Sent Faxes"):
+        outbox = get_srfax_outbox()
+        if outbox and outbox['Status'] == 'Success':
+            faxes = outbox['Result']
+            
+            # Create a DataFrame from the faxes data
+            df = pd.DataFrame(faxes)
+            df = df[['ToFaxNumber', 'DateSent', 'SentStatus', 'FileName']]  # Include FileName for resending
+            df.columns = ['To', 'Date', 'Status', 'FileName']  # Rename columns for display
+            
+            # Store the DataFrame in session state for later use
+            st.session_state['faxes_df'] = df
+            st.session_state['selected_fax_index'] = None
+            st.session_state['selected_fax_info'] = "No fax selected"
+
+    if 'faxes_df' in st.session_state:
+        # Display the DataFrame with selectable rows
+        selected_df = st.data_editor(
+            st.session_state['faxes_df'].drop(columns=['FileName']),
+            hide_index=True,
+            disabled=["To", "Date", "Status"],
+            use_container_width=True,
+            height=300,
+            num_rows="dynamic",
+            key="selectable_df",
+            on_change=on_row_select
+        )
+        
+        # Display the selected fax information
+        st.write(st.session_state['selected_fax_info'])
+        
+        # Check if any row is selected
+        if st.session_state['selected_fax_index'] is not None:
+            if st.button("Resend Selected Fax"):
+                selected_fax = st.session_state['faxes_df'].iloc[st.session_state['selected_fax_index']]
+                result = resend_srfax(selected_fax['FileName'])
+                if result and result['Status'] == 'Success':
+                    st.success("Fax resent successfully!")
+                else:
+                    st.error("Failed to resend fax. Please try again.")                       
 if __name__ == "__main__":
     main()
