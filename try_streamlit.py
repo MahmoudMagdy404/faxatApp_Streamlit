@@ -31,7 +31,7 @@ Braces = ["Back", "Knees", "Elbow", "Shoulder", "Ankle", "Wrists"]
 BracesForms = {
     "Back": {
         'L0637': 'https://docs.google.com/forms/d/e/1FAIpQLSfB7423u2nFC_boKiOq8w-8E6ClY9iY2QLW_-_-SLQwJfbdZg/formResponse',
-        'L0457-G': 'https://docs.google.com/forms/d/e/1FAIpQLSe-XTJycYlVMnS7PU6YeIeDXugcBMLuJ1YGr7Y8KEsO3iXRlQ/formResponse'
+        'L0457': 'https://docs.google.com/forms/d/e/1FAIpQLSe-XTJycYlVMnS7PU6YeIeDXugcBMLuJ1YGr7Y8KEsO3iXRlQ/formResponse'
     },
     "Knees": {
         'L1843': 'https://docs.google.com/forms/d/e/1FAIpQLScf00eJOF1u_60swPRguOZEJTtU7mx6lxIfNUWEJzndiDPD5A/formResponse',
@@ -431,16 +431,7 @@ def main():
     # Sidebar navigation
     st.sidebar.title("Navigation")
     page = st.sidebar.radio("Go to", ["Form Submission", "Send Fax", "Sent Faxes List"])
-    # Adding a note in the sidebar
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("### Ankle States")
-    st.sidebar.markdown("- AR")
-    st.sidebar.markdown("- TN")
-    st.sidebar.markdown("- MN")
-    st.sidebar.markdown("- IL")
-    st.sidebar.markdown("- NJ")
-    st.sidebar.markdown("- OH")
-    st.sidebar.markdown("- KY")
+
     if page == "Form Submission":
         st.title("Brace Form Submission")
         
