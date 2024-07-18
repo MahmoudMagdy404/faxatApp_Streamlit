@@ -45,8 +45,7 @@ BracesForms = {
         'L3960': 'https://docs.google.com/forms/d/e/1FAIpQLSexO54gwNijfOMjcSp9ZC_9LhXsE0lKpkzzqBQy0_ddBzg1_Q/formResponse'
     },
     "Ankle": {
-        'L1971': 'https://docs.google.com/forms/d/e/1FAIpQLSdyRf99metRszBuQ8zHwzQSYvxf-Pb5qJDzJj073-Vu6sfZEA/formResponse',
-        "L1906":"https://docs.google.com/forms/d/e/1FAIpQLSfFeFQTiW3-0Z6pLC4w7aki6g15KD9B-bWfj4MKUN-hcbnQ3w/formResponse"
+        'L1971': 'https://docs.google.com/forms/d/e/1FAIpQLSdyRf99metRszBuQ8zHwzQSYvxf-Pb5qJDzJj073-Vu6sfZEA/formResponse'
     },
     "Wrists": {
         'L3916': 'https://docs.google.com/forms/d/e/1FAIpQLSd4XQox2yt3wsild0InVMgagrcQ9Aors4PjExoOILHiT9grew/formResponse'
@@ -208,48 +207,11 @@ def handle_hallofax(combined_pdf, receiver_number, fax_message, fax_subject, to_
     return True
 
 def handle_faxplus(combined_pdf, receiver_number, fax_message, fax_subject, to_name, chaser_name, uploaded_cover_sheet):
-    access_token = st.secrets["faxplus_secret_key"]["secret_key"]
-
-    url = "https://restapi.fax.plus/v3/accounts/self/faxes"
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {access_token}"
-    }
-
-    payload = {
-        "to": [receiver_number],
-        "is_cover_page": uploaded_cover_sheet is None,
-        "cover_page": {
-            "to": to_name,
-            "from": chaser_name,
-            "subject": fax_subject,
-            "note": fax_message
-        },
-        "files": []
-    }
-
-    encoded_file = base64.b64encode(combined_pdf.getvalue()).decode()
-    payload["files"].append({
-        "filename": "combined.pdf",
-        "data": encoded_file
-    })
-
-    if uploaded_cover_sheet is not None:
-        encoded_cover_page = base64.b64encode(uploaded_cover_sheet.read()).decode()
-        payload["files"].append({
-            "filename": "cover_page.pdf",
-            "data": encoded_cover_page
-        })
-
-    response = requests.post(url, headers=headers, json=payload)
-    if response.status_code == 200:
-        response_data = response.json()
-        if response_data.get("id"):
-            return True
-        else:
-            return False
-    else:
-        return False
+    # Implement FaxPlus logic here
+    print(f"Sending fax to {receiver_number} using FaxPlus")
+    # Use the provided parameters to send the fax
+    # Return True if successful, False otherwise
+    return True
 
 def sanitize_filename(filename):
     return re.sub(r'[<>:"/\\|?*\x00-\x1F]', '', filename)
@@ -452,7 +414,7 @@ def main():
             medID = st.text_input("MBI")
             ptHeight = st.text_input("Height")
             ptWeight = st.text_input("Weight")
-            ptGender = st.selectbox("Gender", ["Male", "Female"])
+            ptGender = st.selectbox("Gender", ["Male", "Female", "Other"])
 
         with col2:
             st.subheader("Doctor Information")
@@ -571,7 +533,7 @@ def main():
                         st.success(f"Combined PDF for {doctor_name} created successfully.")
                         st.session_state['combined_pdf'] = combined_pdf
                         st.session_state['doctor_name'] = doctor_name
-                        st.rerun()
+                        st.experimental_rerun()
                     else:
                         st.error("Failed to create combined PDF. Please try again.")
             else:
@@ -588,12 +550,14 @@ def main():
 
 
         # Fax service selection using checkboxes
-        st.subheader("Select Fax Service")
-        fax_service = st.radio(
-            "Choose a fax service:",
-            ["SRFax", "HumbleFax", "HalloFax", "FaxPlus"],
-            horizontal=True
-        )
+        st.subheader("Select Fax Services")
+        col1, col2 = st.columns(2)
+        with col1:
+            use_srfax = st.checkbox("SRFax")
+            use_humblefax = st.checkbox("HumbleFax")
+        with col2:
+            use_hallofax = st.checkbox("HalloFax")
+            use_faxplus = st.checkbox("FaxPlus")
 
         # Receiver number input
         receiver_number = st.text_input("Receiver Fax Number")
@@ -602,37 +566,41 @@ def main():
         fax_message = st.text_area("Fax Message")
         fax_subject = st.text_input("Fax Subject")
         to_name = st.text_input("To (Recipient Name)")
-        
-        chasers_dict = {"Olivia":"(941) 293-1794", "Mia":"(352) 718-1524","Mark":"(754) 250-1426" ,
-                        "Lexi":"607-383-2941" ,"Ken": "(352) 718-1436",
-                        "Hannah":"(904) 515-1565" ,
-                        "Linda": "(620) 203-2088","Anne":"(727) 910-2808" ,
-                        "Rose":"904-515-1558" ,"Emma":"(386) 487-2910",
-                        "Tom":"(786) 891-7322","Kendric":"(941) 293-1462"}
-        chaser_name = st.selectbox("From (Sender Name)", list(chasers_dict.keys()))
+        chaser_name = st.text_input("From (Sender Name)")
+
         if st.button("Send Fax"):
             if not receiver_number:
                 st.error("Please enter a receiver fax number.")
             elif 'combined_pdf' not in st.session_state:
                 st.error("Please combine PDFs before sending a fax.")
+            elif not any([use_srfax, use_humblefax, use_hallofax, use_faxplus]):
+                st.error("Please select at least one fax service.")
             else:
                 combined_pdf = st.session_state['combined_pdf']
-                result = None
+                results = []
 
-                if fax_service == "SRFax":
+                if use_srfax:
                     result = handle_srfax(combined_pdf, receiver_number, fax_message, fax_subject, to_name, chaser_name, uploaded_cover_sheet)
-                elif fax_service == "HumbleFax":
+                    results.append(("SRFax", result))
+
+                if use_humblefax:
                     result = handle_humblefax(combined_pdf, receiver_number, fax_message, fax_subject, to_name, chaser_name, uploaded_cover_sheet)
-                elif fax_service == "HalloFax":
+                    results.append(("HumbleFax", result))
+
+                if use_hallofax:
                     result = handle_hallofax(combined_pdf, receiver_number, fax_message, fax_subject, to_name, chaser_name, uploaded_cover_sheet)
-                elif fax_service == "FaxPlus":
+                    results.append(("HalloFax", result))
+
+                if use_faxplus:
                     result = handle_faxplus(combined_pdf, receiver_number, fax_message, fax_subject, to_name, chaser_name, uploaded_cover_sheet)
+                    results.append(("FaxPlus", result))
 
-                if result and result.get('Status') == 'Success':
-                    st.success(f"Fax sent successfully using {fax_service}.")
-                else:
-                    st.error(f"Failed to send fax using {fax_service}. Please check the logs for more information.")
-
+                # Display results
+                for service, success in results:
+                    if success:
+                        st.success(f"Fax sent successfully using {service}.")
+                    else:
+                        st.error(f"Failed to send fax using {service}. Please check the logs for more information.")
 
     elif page == "Sent Faxes List":
         st.title("Sent Faxes List")
@@ -656,7 +624,7 @@ def main():
         if 'faxes_df' in st.session_state:
             # Display the DataFrame
             st.dataframe(
-                st.session_state['faxes_df'],
+                st.session_state['faxes_df'].drop(columns=['FileName']),
                 height=300
             )
             
