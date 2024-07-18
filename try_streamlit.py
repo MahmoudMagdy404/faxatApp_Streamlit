@@ -199,20 +199,58 @@ def handle_humblefax(combined_pdf, receiver, fax_message, fax_subject, to_name, 
     else:
         print(f"HTTP Error: {send_response.status_code} - {send_response.text}")
         return False
-
+#TODO
 def handle_hallofax(combined_pdf, receiver_number, fax_message, fax_subject, to_name, chaser_name, uploaded_cover_sheet):
     # Implement HalloFax logic here
     print(f"Sending fax to {receiver_number} using HalloFax")
     # Use the provided parameters to send the fax
     # Return True if successful, False otherwise
     return True
-
+#TODO -> Try to fix it
 def handle_faxplus(combined_pdf, receiver_number, fax_message, fax_subject, to_name, chaser_name, uploaded_cover_sheet):
-    # Implement FaxPlus logic here
-    print(f"Sending fax to {receiver_number} using FaxPlus")
-    # Use the provided parameters to send the fax
-    # Return True if successful, False otherwise
-    return True
+    access_token =  st.secrets["faxplus_secret_key"]["secret_key "]
+
+
+    url = "https://restapi.fax.plus/v3/accounts/self/faxes"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {access_token}"
+    }
+
+    payload = {
+        "to": [receiver_number],
+        "is_cover_page": uploaded_cover_sheet is None,
+        "cover_page": {
+            "to": to_name,
+            "from": chaser_name,
+            "subject": fax_subject,
+            "note": fax_message
+        },
+        "files": []
+    }
+
+    encoded_file = base64.b64encode(combined_pdf.getvalue()).decode()
+    payload["files"].append({
+        "filename": "combined.pdf",
+        "data": encoded_file
+    })
+
+    if uploaded_cover_sheet is not None:
+        encoded_cover_page = base64.b64encode(uploaded_cover_sheet.read()).decode()
+        payload["files"].append({
+            "filename": "cover_page.pdf",
+            "data": encoded_cover_page
+        })
+
+    response = requests.post(url, headers=headers, json=payload)
+    if response.status_code == 200:
+        response_data = response.json()
+        if response_data.get("id"):
+            return True
+        else:
+            return False
+    else:
+        return False
 
 def sanitize_filename(filename):
     return re.sub(r'[<>:"/\\|?*\x00-\x1F]', '', filename)
@@ -236,6 +274,13 @@ def get_srfax_outbox():
         return response.json()
     else:
         return None
+#TODO
+def get_humble_outbox():
+    return
+def get_hallo_outbox():
+    return
+def get_faxplus_outbox():
+    return
     
 def resend_srfax(fax_id):
     access_id = st.secrets["sr_access_id"]["access_id"]
@@ -254,6 +299,14 @@ def resend_srfax(fax_id):
         return response.json()
     else:
         return None
+#TODO
+def resend_humble(fax_id):
+    return
+def resend_hallo(fax_id):
+    return
+def resend_faxplus(fax_id):
+    return
+
 def on_row_select():
     if 'selected_fax_index' in st.session_state and st.session_state['selected_fax_index'] is not None:
         selected_fax = st.session_state['faxes_df'].iloc[st.session_state['selected_fax_index']]
@@ -559,16 +612,12 @@ def main():
             st.success("Combined PDF is ready for further processing (e.g., sending faxes).")
 
 
-        # Fax service selection using checkboxes
-        st.subheader("Select Fax Services")
-        col1, col2 = st.columns(2)
-        with col1:
-            use_srfax = st.checkbox("SRFax")
-            use_humblefax = st.checkbox("HumbleFax")
-        with col2:
-            use_hallofax = st.checkbox("HalloFax")
-            use_faxplus = st.checkbox("FaxPlus")
-
+        st.subheader("Select Fax Service")
+        fax_service = st.radio(
+            "Choose a fax service:",
+            ["SRFax", "HumbleFax", "HalloFax", "FaxPlus"],
+            horizontal=True
+        )
         # Receiver number input
         receiver_number = st.text_input("Receiver Fax Number")
 
@@ -583,48 +632,76 @@ def main():
                 st.error("Please enter a receiver fax number.")
             elif 'combined_pdf' not in st.session_state:
                 st.error("Please combine PDFs before sending a fax.")
-            elif not any([use_srfax, use_humblefax, use_hallofax, use_faxplus]):
-                st.error("Please select at least one fax service.")
             else:
                 combined_pdf = st.session_state['combined_pdf']
-                results = []
+                result = None
 
-                if use_srfax:
+                if fax_service == "SRFax":
                     result = handle_srfax(combined_pdf, receiver_number, fax_message, fax_subject, to_name, chaser_name, uploaded_cover_sheet)
-                    results.append(("SRFax", result))
-
-                if use_humblefax:
+                elif fax_service == "HumbleFax":
                     result = handle_humblefax(combined_pdf, receiver_number, fax_message, fax_subject, to_name, chaser_name, uploaded_cover_sheet)
-                    results.append(("HumbleFax", result))
-
-                if use_hallofax:
+                elif fax_service == "HalloFax":
                     result = handle_hallofax(combined_pdf, receiver_number, fax_message, fax_subject, to_name, chaser_name, uploaded_cover_sheet)
-                    results.append(("HalloFax", result))
-
-                if use_faxplus:
+                elif fax_service == "FaxPlus":
                     result = handle_faxplus(combined_pdf, receiver_number, fax_message, fax_subject, to_name, chaser_name, uploaded_cover_sheet)
-                    results.append(("FaxPlus", result))
 
-                # Display results
-                for service, success in results:
-                    if success:
-                        st.success(f"Fax sent successfully using {service}.")
-                    else:
-                        st.error(f"Failed to send fax using {service}. Please check the logs for more information.")
+                if result and result.get('Status') == 'Success':
+                    st.success(f"Fax sent successfully using {fax_service}.")
+                else:
+                    st.error(f"Failed to send fax using {fax_service}. Please check the logs for more information.")
 
     elif page == "Sent Faxes List":
         st.title("Sent Faxes List")
-
         st.header("Refax Option")
+
+        # Fax service selection using radio buttons
+        st.subheader("Select Fax Service")
+        fax_service = st.radio(
+            "Choose a fax service:",
+            ["SRFax", "HumbleFax", "HalloFax", "FaxPlus"],
+            horizontal=True
+        )
+
         if st.button("List Sent Faxes"):
-            outbox = get_srfax_outbox()
-            if outbox and outbox['Status'] == 'Success':
-                faxes = outbox['Result']
-                
+            all_faxes = []
+
+            if fax_service == 'SRFax':
+                outbox = get_srfax_outbox()
+                if outbox and outbox['Status'] == 'Success':
+                    faxes = outbox['Result']
+                    for fax in faxes:
+                        fax['Service'] = 'SRFax'
+                    all_faxes.extend(faxes)
+
+            elif fax_service == 'HumbleFax':
+                outbox = get_humble_outbox()
+                if outbox and outbox['Status'] == 'Success':
+                    faxes = outbox['Result']
+                    for fax in faxes:
+                        fax['Service'] = 'HumbleFax'
+                    all_faxes.extend(faxes)
+
+            elif fax_service == 'HalloFax':
+                outbox = get_hallo_outbox()
+                if outbox and outbox['Status'] == 'Success':
+                    faxes = outbox['Result']
+                    for fax in faxes:
+                        fax['Service'] = 'HalloFax'
+                    all_faxes.extend(faxes)
+
+            elif fax_service == 'FaxPlus':
+                outbox = get_faxplus_outbox()
+                if outbox and outbox['Status'] == 'Success':
+                    faxes = outbox['Result']
+                    for fax in faxes:
+                        fax['Service'] = 'FaxPlus'
+                    all_faxes.extend(faxes)
+
+            if all_faxes:
                 # Create a DataFrame from the faxes data
-                df = pd.DataFrame(faxes)
-                df = df[['ToFaxNumber', 'DateSent', 'SentStatus', 'FileName']]  # Include FileName for resending
-                df.columns = ['To', 'Date', 'Status', 'FileName']  # Rename columns for display
+                df = pd.DataFrame(all_faxes)
+                df = df[['ToFaxNumber', 'DateSent', 'SentStatus', 'FileName', 'Service']]  # Include FileName for resending
+                df.columns = ['To', 'Date', 'Status', 'FileName', 'Service']  # Rename columns for display
                 
                 # Store the DataFrame in session state for later use
                 st.session_state['faxes_df'] = df
@@ -652,7 +729,19 @@ def main():
             if st.session_state.get('selected_fax_index') is not None:
                 if st.button("Resend Selected Fax"):
                     selected_fax = st.session_state['faxes_df'].iloc[st.session_state['selected_fax_index']]
-                    result = resend_srfax(selected_fax['FileName'])
+                    service = selected_fax['Service']
+                    if service == 'SRFax':
+                        result = resend_srfax(selected_fax['FileName'])
+                    elif service == 'HumbleFax':
+                        result = resend_humble(selected_fax['FileName'])
+                    elif service == 'HalloFax':
+                        result = resend_hallo(selected_fax['FileName'])
+                    elif service == 'FaxPlus':
+                        result = resend_faxplus(selected_fax['FileName'])
+                    else:
+                        st.error("Unknown fax service.")
+                        return
+                    
                     if result and result['Status'] == 'Success':
                         st.success("Fax resent successfully!")
                     else:
