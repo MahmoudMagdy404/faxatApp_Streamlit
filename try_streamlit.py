@@ -35,7 +35,7 @@ BracesForms = {
     },
     "Knees": {
         'L1843': 'https://docs.google.com/forms/d/e/1FAIpQLScf00eJOF1u_60swPRguOZEJTtU7mx6lxIfNUWEJzndiDPD5A/formResponse',
-        'L1852': 'https://docs.google.com/forms/d/e/1FAIpQLSec52MiutxlJmayam2l0FiQSorT9gyG9efhx7bG7D3K2nPagg/formResponse',
+        'L1852-G': 'https://docs.google.com/forms/d/e/1FAIpQLSec52MiutxlJmayam2l0FiQSorT9gyG9efhx7bG7D3K2nPagg/formResponse',
         'L1845': 'https://docs.google.com/forms/d/e/1FAIpQLSfav9S2KJRjyqYClJgZrSuHibaaxSy5gsxvDpqLVrCTyM_8sA/formResponse'
     },
     "Elbow": {
@@ -433,7 +433,7 @@ def main():
     page = st.sidebar.radio("Go to", ["Form Submission", "Send Fax", "Sent Faxes List"])
     # Adding a note in the sidebar
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### Ankle States")
+    st.sidebar.markdown("### Ankle States : L1906")
     st.sidebar.markdown("- AR")
     st.sidebar.markdown("- TN")
     st.sidebar.markdown("- MN")
