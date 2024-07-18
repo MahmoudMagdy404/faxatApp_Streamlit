@@ -25,6 +25,7 @@ from dropbox.exceptions import AuthError
 from dropbox.files import WriteMode
 from google_auth_oauthlib.flow import InstalledAppFlow
 
+
 # Define the braces and their forms
 Braces = ["Back", "Knees", "Elbow", "Shoulder", "Ankle", "Wrists"]
 BracesForms = {
@@ -51,10 +52,11 @@ BracesForms = {
     }
 }
 
+
 def handle_srfax(combined_pdf, receiver_number, fax_message, fax_subject, to_name, chaser_name, uploaded_cover_sheet):
     # API credentials
-    access_id = "362654"
-    access_pwd = "Alvin2024$"
+    access_id = st.secrets["sr_access_id"]["access_id"]
+    access_pwd = st.secrets["sr_access_pwd"]["access_pwd"]
 
     # Fax details
     caller_id = "8888516047"
@@ -121,9 +123,9 @@ def handle_srfax(combined_pdf, receiver_number, fax_message, fax_subject, to_nam
         return False
 
 def handle_humblefax(combined_pdf, receiver, fax_message, fax_subject, to_name, chaser_name, uploaded_cover_sheet):
-    access_key = "df95f7caf15a8e5c08235625"
-    secret_key = "1e2751cfb091a2f72a2a273f"
-    
+
+    access_key = st.secrets["humble_access_key"]["access_key"]
+    secret_key = st.secrets["humble_secret_key"]["secret_key"]
     # Step 1: Create a temporary fax
     create_tmp_fax_url = "https://api.humblefax.com/tmpFax"
     headers = {
@@ -215,8 +217,8 @@ def sanitize_filename(filename):
     return re.sub(r'[<>:"/\\|?*\x00-\x1F]', '', filename)
 
 def get_srfax_outbox():
-    access_id = "362654"
-    access_pwd = "Alvin2024$"
+    access_id = st.secrets["sr_access_id"]["access_id"]
+    access_pwd = st.secrets["sr_access_pwd"]["access_pwd"]
     
     url = "https://www.srfax.com/SRF_SecWebSvc.php"
     payload = {
@@ -235,8 +237,8 @@ def get_srfax_outbox():
         return None
     
 def resend_srfax(fax_id):
-    access_id = "362654"
-    access_pwd = "Alvin2024$"
+    access_id = st.secrets["sr_access_id"]["access_id"]
+    access_pwd = st.secrets["sr_access_pwd"]["access_pwd"]
     
     url = "https://www.srfax.com/SRF_SecWebSvc.php"
     payload = {
@@ -387,50 +389,6 @@ def combine_pdfs(fname):
         st.error(f"An error occurred: {str(error)}")
         return None, str(error)
 
-    st.title("List Sent Faxes")
-                    
-    st.header("Refax Option")
-    if st.button("List Sent Faxes"):
-        outbox = get_srfax_outbox()
-        if outbox and outbox['Status'] == 'Success':
-            faxes = outbox['Result']
-            
-            # Create a DataFrame from the faxes data
-            df = pd.DataFrame(faxes)
-            df = df[['ToFaxNumber', 'DateSent', 'SentStatus', 'FileName']]  # Include FileName for resending
-            df.columns = ['To', 'Date', 'Status', 'FileName']  # Rename columns for display
-            
-            # Store the DataFrame in session state for later use
-            st.session_state['faxes_df'] = df
-            st.session_state['selected_fax_index'] = None
-            st.session_state['selected_fax_info'] = "No fax selected"
-
-    if 'faxes_df' in st.session_state:
-        # Display the DataFrame
-        st.dataframe(
-            st.session_state['faxes_df'].drop(columns=['FileName']),
-            height=300
-        )
-        
-        # Add a number input for row selection
-        selected_index = st.number_input("Select a row number", min_value=1, max_value=len(st.session_state['faxes_df']), value=1, step=1) - 1
-        
-        if st.button("Confirm Selection"):
-            st.session_state['selected_fax_index'] = selected_index
-            on_row_select()
-        
-        # Display the selected fax information
-        st.write(st.session_state.get('selected_fax_info', "No fax selected"))
-        
-        # Check if any row is selected
-        if st.session_state.get('selected_fax_index') is not None:
-            if st.button("Resend Selected Fax"):
-                selected_fax = st.session_state['faxes_df'].iloc[st.session_state['selected_fax_index']]
-                result = resend_srfax(selected_fax['FileName'])
-                if result and result['Status'] == 'Success':
-                    st.success("Fax resent successfully!")
-                else:
-                    st.error("Failed to resend fax. Please try again.")  
 def main():
     # Sidebar navigation
     st.sidebar.title("Navigation")
@@ -556,6 +514,11 @@ def main():
 
                     st.success(f"{len(selected_urls)} form(s) are ready for submission. Please click the links above to submit.")
 
+
+
+    elif page == "Send Fax":
+        st.title("Send Fax")
+
         st.header("Combine PDFs")
         uploaded_cover_sheet = st.file_uploader("Upload Cover Sheet PDF (Optional)", type="pdf")
 
@@ -585,10 +548,6 @@ def main():
             )
             st.success("Combined PDF is ready for further processing (e.g., sending faxes).")
 
-    elif page == "Send Fax":
-        st.title("Send Fax")
-
-        st.header("Send Fax")
 
         # Fax service selection using checkboxes
         st.subheader("Select Fax Services")
