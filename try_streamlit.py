@@ -52,7 +52,14 @@ BracesForms = {
         'L3916': 'https://docs.google.com/forms/d/e/1FAIpQLSd4XQox2yt3wsild0InVMgagrcQ9Aors4PjExoOILHiT9grew/formResponse'
     }
 }
-
+chasers_dict = {
+    "Olivia":"(941) 293-1794" , "Mia":"(352) 718-1524",
+    "Lexi":"(607) 383-2941" , "Mark":"(754) 250-1426",
+    "Kendric":"(941) 293-1462" , "Ken":"(352) 718-1436",
+    "Anne":"(727) 910-2808" , "Linda":"(620) 203-2088",
+    "Tom":"(786) 891-7322" , "Rose":"(904) 515-1558",
+    "Emma":"(386) 487-2910" , "HANNAH":"(904) 515-1565",
+}
 
 def handle_srfax(combined_pdf, receiver_number, fax_message, fax_subject, to_name, chaser_name, uploaded_cover_sheet):
     # API credentials
@@ -477,7 +484,7 @@ def main():
             medID = st.text_input("MBI")
             ptHeight = st.text_input("Height")
             ptWeight = st.text_input("Weight")
-            ptGender = st.selectbox("Gender", ["Male", "Female", "Other"])
+            ptGender = st.selectbox("Gender", ["Male", "Female"])
 
         with col2:
             st.subheader("Doctor Information")
@@ -625,7 +632,7 @@ def main():
         fax_message = st.text_area("Fax Message")
         fax_subject = st.text_input("Fax Subject")
         to_name = st.text_input("To (Recipient Name)")
-        chaser_name = st.text_input("From (Sender Name)")
+        chaser_name = st.selectbox("From (Sender Name)" , list(chasers_dict.keys()))
 
         if st.button("Send Fax"):
             if not receiver_number:
@@ -634,16 +641,18 @@ def main():
                 st.error("Please combine PDFs before sending a fax.")
             else:
                 combined_pdf = st.session_state['combined_pdf']
+                chaser_number = chasers_dict[chaser_name]
+                fax_message_with_number = f"{fax_message}\nFrom: {chaser_name} - {chaser_number}"
                 result = None
 
                 if fax_service == "SRFax":
-                    result = handle_srfax(combined_pdf, receiver_number, fax_message, fax_subject, to_name, chaser_name, uploaded_cover_sheet)
+                    result = handle_srfax(combined_pdf, receiver_number, fax_message_with_number, fax_subject, to_name, chaser_name, uploaded_cover_sheet)
                 elif fax_service == "HumbleFax":
-                    result = handle_humblefax(combined_pdf, receiver_number, fax_message, fax_subject, to_name, chaser_name, uploaded_cover_sheet)
+                    result = handle_humblefax(combined_pdf, receiver_number, fax_message_with_number, fax_subject, to_name, chaser_name, uploaded_cover_sheet)
                 elif fax_service == "HalloFax":
-                    result = handle_hallofax(combined_pdf, receiver_number, fax_message, fax_subject, to_name, chaser_name, uploaded_cover_sheet)
+                    result = handle_hallofax(combined_pdf, receiver_number, fax_message_with_number, fax_subject, to_name, chaser_name, uploaded_cover_sheet)
                 elif fax_service == "FaxPlus":
-                    result = handle_faxplus(combined_pdf, receiver_number, fax_message, fax_subject, to_name, chaser_name, uploaded_cover_sheet)
+                    result = handle_faxplus(combined_pdf, receiver_number, fax_message_with_number, fax_subject, to_name, chaser_name, uploaded_cover_sheet)
 
                 if result and result.get('Status') == 'Success':
                     st.success(f"Fax sent successfully using {fax_service}.")
