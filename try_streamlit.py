@@ -632,7 +632,7 @@ def main():
         fax_message = st.text_area("Fax Message")
         fax_subject = st.text_input("Fax Subject")
         to_name = st.text_input("To (Recipient Name)")
-        chaser_name = st.selectbox("From (Sender Name)" , list(chasers_dict.keys()))
+        chaser_name = st.selectbox("From (Sender Name)", list(chasers_dict.keys()))
 
         if st.button("Send Fax"):
             if not receiver_number:
@@ -641,9 +641,11 @@ def main():
                 st.error("Please combine PDFs before sending a fax.")
             else:
                 combined_pdf = st.session_state['combined_pdf']
-                chaser_number = chasers_dict[chaser_name]
-                fax_message_with_number = f"{fax_message}\nFrom: {chaser_name} - {chaser_number}"
                 result = None
+
+                # Add the chaser's number to the fax message
+                chaser_number = chasers_dict[chaser_name]
+                fax_message_with_number = f"{fax_message}\n\nFrom: {chaser_name} ({chaser_number})"
 
                 if fax_service == "SRFax":
                     result = handle_srfax(combined_pdf, receiver_number, fax_message_with_number, fax_subject, to_name, chaser_name, uploaded_cover_sheet)
@@ -654,7 +656,7 @@ def main():
                 elif fax_service == "FaxPlus":
                     result = handle_faxplus(combined_pdf, receiver_number, fax_message_with_number, fax_subject, to_name, chaser_name, uploaded_cover_sheet)
 
-                if result and result.get('Status') == 'Success':
+                if result :
                     st.success(f"Fax sent successfully using {fax_service}.")
                 else:
                     st.error(f"Failed to send fax using {fax_service}. Please check the logs for more information.")
