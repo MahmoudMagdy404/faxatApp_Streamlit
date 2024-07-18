@@ -618,34 +618,35 @@ def main():
                 
                 # Store the DataFrame in session state for later use
                 st.session_state['faxes_df'] = df
+                st.session_state['selected_fax_index'] = None
+                st.session_state['selected_fax_info'] = "No fax selected"
 
         if 'faxes_df' in st.session_state:
-            # Display the DataFrame with selectable rows
-            selected_rows = st.data_editor(
+            # Display the DataFrame
+            st.dataframe(
                 st.session_state['faxes_df'].drop(columns=['FileName']),
-                hide_index=True,
-                disabled=["To", "Date", "Status"],
-                use_container_width=True,
-                height=300,
-                num_rows="dynamic",
-                key="selectable_df"
+                height=300
             )
             
+            # Add a number input for row selection
+            selected_index = st.number_input("Select a row number", min_value=1, max_value=len(st.session_state['faxes_df']), value=1, step=1) - 1
+            
+            if st.button("Confirm Selection"):
+                st.session_state['selected_fax_index'] = selected_index
+                on_row_select()
+            
+            # Display the selected fax information
+            st.write(st.session_state.get('selected_fax_info', "No fax selected"))
+            
             # Check if any row is selected
-            if not selected_rows.empty:
-                # Find the index of the selected row
-                selected_index = selected_rows.index[0]
-                selected_fax = st.session_state['faxes_df'].iloc[selected_index]
-                st.write(f"Selected fax: To {selected_fax['To']} sent on {selected_fax['Date']}")
-                
+            if st.session_state.get('selected_fax_index') is not None:
                 if st.button("Resend Selected Fax"):
+                    selected_fax = st.session_state['faxes_df'].iloc[st.session_state['selected_fax_index']]
                     result = resend_srfax(selected_fax['FileName'])
                     if result and result['Status'] == 'Success':
                         st.success("Fax resent successfully!")
                     else:
                         st.error("Failed to resend fax. Please try again.")
-            else:
-                st.info("Please select a fax to resend.")
 
 if __name__ == "__main__":
     main()
