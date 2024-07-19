@@ -430,7 +430,6 @@ def manual_dropbox_token_refresh():
         except Exception as e:
             st.error(f"Failed to refresh Dropbox token: {e}")
             
-# Function to get Dropbox client
 def get_dropbox_client():
     try:
         client = dropbox.Dropbox(st.secrets["dropbox"]["access_token"])
@@ -439,13 +438,14 @@ def get_dropbox_client():
     except dropbox.exceptions.AuthError as e:
         if "ExpiredAccessToken" in str(e):
             st.error("Dropbox token has expired.")
-            if st.button("Refresh Dropbox Token"):
-                update_dropbox_token()
+            new_token = update_dropbox_token()
+            if new_token:
+                client = dropbox.Dropbox(new_token)
+                return client
         else:
             st.error("Dropbox authentication error. Please check your access token.")
         return None
 
-# Function to update Dropbox token
 def update_dropbox_token():
     new_token = st.text_input("Enter new Dropbox access token:", type="password")
     if st.button("Update Token") and new_token:
@@ -454,7 +454,6 @@ def update_dropbox_token():
         return new_token
     return None
 
-# Function to download token from Dropbox
 def download_token_from_dropbox():
     client = get_dropbox_client()
     if client is None:
@@ -476,7 +475,6 @@ def download_token_from_dropbox():
     
     return False
 
-# Function to upload token to Dropbox
 def upload_token_to_dropbox(token_data):
     client = get_dropbox_client()
     if client is None:
@@ -489,7 +487,6 @@ def upload_token_to_dropbox(token_data):
     except Exception as e:
         st.error(f'Error uploading token to Dropbox: {e}')
         return False
-
 # Function to get Google Drive credentials
 def get_credentials():
     creds = None
@@ -590,8 +587,8 @@ def main():
     # Sidebar navigation
     st.sidebar.title("Navigation")
     page = st.sidebar.radio("Go to", ["Form Submission", "Send Fax", "Sent Faxes List"])
-    if st.sidebar.button("Refresh Dropbox Token"):
-        manual_dropbox_token_refresh()
+    # if st.sidebar.button("Refresh Dropbox Token"):
+    #     manual_dropbox_token_refresh()
     # Adding a note in the sidebar
     st.sidebar.markdown("---")
     st.sidebar.markdown("### Ankle States → L1906")
