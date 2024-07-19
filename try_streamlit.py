@@ -232,37 +232,39 @@ def handle_faxplus(combined_pdf, receiver_number, fax_message, fax_subject, to_n
         'Content-Type': 'application/json'
     }
 
-    # Encode the main PDF file
-    encoded_file = base64.b64encode(combined_pdf.getvalue()).decode()
-
-    # Prepare files list
-    files = [{"name": "combined.pdf", "data": encoded_file}]
-
-    # If a cover sheet is uploaded, add it to the files list
+    # Prepare files
+    files = []
+    
+    # Handle combined PDF
+    if isinstance(combined_pdf, io.BytesIO):
+        encoded_combined_pdf = base64.b64encode(combined_pdf.getvalue()).decode()
+        files.append({"name": "combined.pdf", "data": encoded_combined_pdf})
+    
+    # Handle cover sheet if uploaded
     if uploaded_cover_sheet is not None:
-        encoded_cover_page = base64.b64encode(uploaded_cover_sheet.read()).decode()
-        files.append({"name": "cover_page.pdf", "data": encoded_cover_page})
+        encoded_cover_sheet = base64.b64encode(uploaded_cover_sheet.read()).decode()
+        files.append({"name": "cover_sheet.pdf", "data": encoded_cover_sheet})
 
     # Construct the payload
     payload = {
-        "to": [receiver_number],
-        "files": files,
-        "comment": {
-            "text": fax_message,
-        },
-        "options": {
-            "enhancement": True,
-            "retry": {
-                "count": 0,
-                "delay": 0
-            }
-        },
-        "from": "+16023469225",  # Using the caller_id from your original function
-        "cover_page": {
-            "name_to": to_name,
-            "name_from": chaser_name,
-            "subject": fax_subject,
-            "message": fax_message
+        "userId": user_id,
+        "payloadOutbox": {
+            "comment": {
+                "tags": [fax_subject],
+                "text": fax_message
+            },
+            "files": files,
+            "from": "+16023469225",  # Using the caller_id from your original function
+            "options": {
+                "enhancement": True,
+                "retry": {
+                    "count": 0,
+                    "delay": 0
+                }
+            },
+            "send_time": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S %z"),
+            "to": [receiver_number],
+            "return_ids": True
         }
     }
 
@@ -275,7 +277,8 @@ def handle_faxplus(combined_pdf, receiver_number, fax_message, fax_subject, to_n
         print("Fax sent successfully:", fax_response)
         return True
     else:
-        print(f"Error sending fax: {response.status_code}, {response.text}")
+        print(f"Error sending fax: {response.status_code}")
+        print(f"Response content: {response.text}")
         return False
 
 def sanitize_filename(filename):
@@ -692,7 +695,7 @@ def main():
 
                 # Add the chaser's number to the fax message
                 chaser_number = chasers_dict[chaser_name]
-                fax_message_with_number = f"{fax_message}\n\n<b>From: {chaser_name} : {chaser_number}<b>"
+                fax_message_with_number = f"{fax_message}<br><br><b>From: {chaser_name}  {chaser_number}</b>"
                 if fax_service == "SRFax":
                     result = handle_srfax(combined_pdf, receiver_number, fax_message_with_number, fax_subject, to_name, chaser_name, uploaded_cover_sheet)
                 elif fax_service == "HumbleFax":
