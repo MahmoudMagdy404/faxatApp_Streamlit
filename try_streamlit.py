@@ -378,14 +378,36 @@ TOKEN_FILE_NAME = 'token.json'
 
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 
+
 def get_dropbox_client():
     try:
-        client = dropbox.Dropbox(DROPBOX_ACCESS_TOKEN)
+        client = dropbox.Dropbox(st.secrets["dropbox"]["access_token"])
+        # Test the connection
         client.users_get_current_account()
         return client
-    except dropbox.exceptions.AuthError:
-        st.error("Dropbox authentication error. Please check your access token.")
+    except AuthError as e:
+        if "ExpiredAccessToken" in str(e):
+            st.error("Dropbox token has expired. Please refresh the token.")
+            new_token = refresh_dropbox_token()
+            if new_token:
+                # Update the client with the new token
+                return dropbox.Dropbox(new_token)
+        else:
+            st.error("Dropbox authentication error. Please check your access token.")
         return None
+
+def refresh_dropbox_token():
+    # This function should implement the process to get a new Dropbox token
+    # You might need to use Dropbox's OAuth 2 flow or another method depending on your setup
+    
+    # For demonstration, let's use a manual input method
+    new_token = st.text_input("Enter new Dropbox access token:")
+    if new_token:
+        # Update the token in Streamlit secrets
+        st.secrets["dropbox"]["access_token"] = new_token
+        st.success("Dropbox token updated successfully!")
+        return new_token
+    return None
 
 def download_token_from_dropbox():
     client = get_dropbox_client()
@@ -393,7 +415,6 @@ def download_token_from_dropbox():
         return False
 
     try:
-        # Download the token from Dropbox
         metadata, response = client.files_download(f'{TOKEN_FOLDER_PATH}/{TOKEN_FILE_NAME}')
         with open(TOKEN_FILE_NAME, 'wb') as f:
             f.write(response.content)
@@ -411,7 +432,6 @@ def download_token_from_dropbox():
         st.error(f'Unexpected error downloading token: {e}')
     
     return False
-
 def upload_token_to_dropbox(token_data):
     client = get_dropbox_client()
     if client is None:
