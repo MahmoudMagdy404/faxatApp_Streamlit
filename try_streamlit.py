@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 import os
 import time
 import pandas as pd
@@ -214,49 +215,67 @@ def handle_hallofax(combined_pdf, receiver_number, fax_message, fax_subject, to_
     # Return True if successful, False otherwise
     return True
 #TODO -> Try to fix it
+
 def handle_faxplus(combined_pdf, receiver_number, fax_message, fax_subject, to_name, chaser_name, uploaded_cover_sheet):
-    access_token =  st.secrets["faxplus_secret_key"]["secret_key "]
+    # Fax.Plus credentials
+    access_token = st.secrets["faxplus_secret_key"]["secret_key"]
+    user_id = st.secrets["faxplus_uid"]["user_id"]
 
+    # Base URL for the API
+    base_url = 'https://restapi.fax.plus/v3'
+    endpoint = f'/accounts/{user_id}/outbox'
+    url = base_url + endpoint
 
-    url = "https://restapi.fax.plus/v3/accounts/self/faxes"
+    # Headers
     headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {access_token}"
+        'Authorization': f'Bearer {access_token}',
+        'Content-Type': 'application/json'
     }
 
-    payload = {
-        "to": [receiver_number],
-        "is_cover_page": uploaded_cover_sheet is None,
-        "cover_page": {
-            "to": to_name,
-            "from": chaser_name,
-            "subject": fax_subject,
-            "note": fax_message
-        },
-        "files": []
-    }
-
+    # Encode the main PDF file
     encoded_file = base64.b64encode(combined_pdf.getvalue()).decode()
-    payload["files"].append({
-        "filename": "combined.pdf",
-        "data": encoded_file
-    })
 
+    # Prepare files list
+    files = [{"name": "combined.pdf", "data": encoded_file}]
+
+    # If a cover sheet is uploaded, add it to the files list
     if uploaded_cover_sheet is not None:
         encoded_cover_page = base64.b64encode(uploaded_cover_sheet.read()).decode()
-        payload["files"].append({
-            "filename": "cover_page.pdf",
-            "data": encoded_cover_page
-        })
+        files.append({"name": "cover_page.pdf", "data": encoded_cover_page})
 
+    # Construct the payload
+    payload = {
+        "to": [receiver_number],
+        "files": files,
+        "comment": {
+            "text": fax_message,
+        },
+        "options": {
+            "enhancement": True,
+            "retry": {
+                "count": 0,
+                "delay": 0
+            }
+        },
+        "from": "+16023469225",  # Using the caller_id from your original function
+        "cover_page": {
+            "name_to": to_name,
+            "name_from": chaser_name,
+            "subject": fax_subject,
+            "message": fax_message
+        }
+    }
+
+    # Make the POST request
     response = requests.post(url, headers=headers, json=payload)
+
+    # Check if the request was successful
     if response.status_code == 200:
-        response_data = response.json()
-        if response_data.get("id"):
-            return True
-        else:
-            return False
+        fax_response = response.json()
+        print("Fax sent successfully:", fax_response)
+        return True
     else:
+        print(f"Error sending fax: {response.status_code}, {response.text}")
         return False
 
 def sanitize_filename(filename):
@@ -286,8 +305,36 @@ def get_humble_outbox():
     return
 def get_hallo_outbox():
     return
+# Function to get outbox faxes from FaxPlus
 def get_faxplus_outbox():
-    return
+    # Your Personal Access Token
+    access_token = st.secrets["faxplus_secret_key"]["secret_key"]
+    user_id = st.secrets["faxplus_uid"]["user_id"]
+
+    # Base URL for the API
+    base_url = 'https://restapi.fax.plus/v3'
+    # Endpoint for listing outbox faxes
+    endpoint = f'/accounts/{user_id}/outbox'
+
+    # Full URL
+    url = base_url + endpoint
+
+    # Headers
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Content-Type': 'application/json'
+    }
+
+    # Make the GET request
+    response = requests.get(url, headers=headers)
+
+    # Check if the request was successful
+    if response.status_code == 200:
+        outbox_faxes = response.json()
+        print("Outbox faxes:", outbox_faxes)
+    else:
+        print(f"Error: {response.status_code}, {response.text}")
+
     
 def resend_srfax(fax_id):
     access_id = st.secrets["sr_access_id"]["access_id"]
@@ -456,7 +503,7 @@ def main():
     page = st.sidebar.radio("Go to", ["Form Submission", "Send Fax", "Sent Faxes List"])
     # Adding a note in the sidebar
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### Ankle States")
+    st.sidebar.markdown("### Ankle States → L1906")
     st.sidebar.markdown("- AR")
     st.sidebar.markdown("- TN")
     st.sidebar.markdown("- MN")
@@ -603,7 +650,7 @@ def main():
                         st.success(f"Combined PDF for {doctor_name} created successfully.")
                         st.session_state['combined_pdf'] = combined_pdf
                         st.session_state['doctor_name'] = doctor_name
-                        st.experimental_rerun()
+                        st.rerun()
                     else:
                         st.error("Failed to create combined PDF. Please try again.")
             else:
@@ -645,8 +692,7 @@ def main():
 
                 # Add the chaser's number to the fax message
                 chaser_number = chasers_dict[chaser_name]
-                fax_message_with_number = f"{fax_message}\n\nFrom: {chaser_name} ({chaser_number})"
-
+                fax_message_with_number = f"{fax_message}\n\n<b>From:</b> {chaser_name} : {chaser_number}"
                 if fax_service == "SRFax":
                     result = handle_srfax(combined_pdf, receiver_number, fax_message_with_number, fax_subject, to_name, chaser_name, uploaded_cover_sheet)
                 elif fax_service == "HumbleFax":
@@ -702,11 +748,10 @@ def main():
 
             elif fax_service == 'FaxPlus':
                 outbox = get_faxplus_outbox()
-                if outbox and outbox['Status'] == 'Success':
-                    faxes = outbox['Result']
-                    for fax in faxes:
+                if outbox:
+                    for fax in outbox:
                         fax['Service'] = 'FaxPlus'
-                    all_faxes.extend(faxes)
+                    all_faxes.extend(outbox)
 
             if all_faxes:
                 # Create a DataFrame from the faxes data
