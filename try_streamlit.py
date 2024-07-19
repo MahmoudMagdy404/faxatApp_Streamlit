@@ -692,7 +692,7 @@ def main():
 
                 # Add the chaser's number to the fax message
                 chaser_number = chasers_dict[chaser_name]
-                fax_message_with_number = f"{fax_message}\n\n<b>From:</b> {chaser_name} : {chaser_number}"
+                fax_message_with_number = f"{fax_message}\n\n<b>From: {chaser_name} : {chaser_number}<b>"
                 if fax_service == "SRFax":
                     result = handle_srfax(combined_pdf, receiver_number, fax_message_with_number, fax_subject, to_name, chaser_name, uploaded_cover_sheet)
                 elif fax_service == "HumbleFax":
