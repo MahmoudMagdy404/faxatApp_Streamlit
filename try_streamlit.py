@@ -25,6 +25,7 @@ import dropbox
 from dropbox.exceptions import AuthError, ApiError
 from dropbox.files import WriteMode
 from google_auth_oauthlib.flow import InstalledAppFlow
+from dropbox import DropboxOAuth2Flow
 
 
 # Define the braces and their forms
@@ -378,19 +379,57 @@ TOKEN_FILE_NAME = 'token.json'
 
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 
+def manual_dropbox_token_refresh():
+    st.write("Please follow these steps to refresh your Dropbox token:")
+    st.write("1. Click the 'Start OAuth Flow' button below.")
+    st.write("2. You'll be redirected to Dropbox. Log in and authorize the app.")
+    st.write("3. Copy the authorization code provided by Dropbox.")
+    st.write("4. Paste the code in the text box below and click 'Submit'.")
+
+    app_key = st.secrets["App_key"]["app_key"]
+    app_secret = st.secrets["App_secret"]["app_secret"]
+    redirect_uri = "https://icofaxes.streamlit.app/"  # This should match your Dropbox app settings
+
+    if st.button("Start OAuth Flow"):
+        auth_flow = DropboxOAuth2Flow(
+            app_key,
+            app_secret,
+            redirect_uri,
+            st.session_state,
+            "dropbox-auth-csrf-token"
+        )
+        authorize_url = auth_flow.start()
+        st.write(f"Please visit this URL to authorize the app: {authorize_url}")
+
+    auth_code = st.text_input("Enter the authorization code:")
+    if st.button("Submit") and auth_code:
+        try:
+            auth_flow = DropboxOAuth2Flow(
+                app_key,
+                app_secret,
+                redirect_uri,
+                st.session_state,
+                "dropbox-auth-csrf-token"
+            )
+            oauth_result = auth_flow.finish(auth_code)
+            new_access_token = oauth_result.access_token
+            
+            # Update the token in Streamlit secrets
+            st.secrets["dropbox"]["access_token"] = new_access_token
+            st.success("Dropbox token updated successfully!")
+        except Exception as e:
+            st.error(f"Failed to refresh Dropbox token: {e}")
 def get_dropbox_client():
     try:
         client = dropbox.Dropbox(st.secrets["dropbox"]["access_token"])
         # Test the connection
         client.users_get_current_account()
         return client
-    except AuthError as e:
+    except dropbox.exceptions.AuthError as e:
         if "ExpiredAccessToken" in str(e):
-            st.error("Dropbox token has expired. Please generate a new access token and update it.")
-            new_token = update_dropbox_token()
-            if new_token:
-                # Update the client with the new token
-                return dropbox.Dropbox(new_token)
+            st.error("Dropbox token has expired.")
+            if st.button("Refresh Dropbox Token"):
+                manual_dropbox_token_refresh()
         else:
             st.error("Dropbox authentication error. Please check your access token.")
         return None
@@ -541,6 +580,8 @@ def main():
     # Sidebar navigation
     st.sidebar.title("Navigation")
     page = st.sidebar.radio("Go to", ["Form Submission", "Send Fax", "Sent Faxes List"])
+    if st.sidebar.button("Refresh Dropbox Token"):
+        manual_dropbox_token_refresh()
     # Adding a note in the sidebar
     st.sidebar.markdown("---")
     st.sidebar.markdown("### Ankle States → L1906")
