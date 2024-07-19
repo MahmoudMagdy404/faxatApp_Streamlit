@@ -378,7 +378,6 @@ TOKEN_FILE_NAME = 'token.json'
 
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 
-
 def get_dropbox_client():
     try:
         client = dropbox.Dropbox(st.secrets["dropbox"]["access_token"])
@@ -387,8 +386,8 @@ def get_dropbox_client():
         return client
     except AuthError as e:
         if "ExpiredAccessToken" in str(e):
-            st.error("Dropbox token has expired. Please refresh the token.")
-            new_token = refresh_dropbox_token()
+            st.error("Dropbox token has expired. Please generate a new access token and update it.")
+            new_token = update_dropbox_token()
             if new_token:
                 # Update the client with the new token
                 return dropbox.Dropbox(new_token)
@@ -396,11 +395,8 @@ def get_dropbox_client():
             st.error("Dropbox authentication error. Please check your access token.")
         return None
 
-def refresh_dropbox_token():
-    # This function should implement the process to get a new Dropbox token
-    # You might need to use Dropbox's OAuth 2 flow or another method depending on your setup
-    
-    # For demonstration, let's use a manual input method
+def update_dropbox_token():
+    # Prompt the user to enter a new access token
     new_token = st.text_input("Enter new Dropbox access token:")
     if new_token:
         # Update the token in Streamlit secrets
