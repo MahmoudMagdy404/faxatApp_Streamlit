@@ -386,8 +386,8 @@ def manual_dropbox_token_refresh():
     st.write("3. Copy the authorization code provided by Dropbox.")
     st.write("4. Paste the code in the text box below and click 'Submit'.")
 
-    app_key = st.secrets["App_key"]["app_key"]
-    app_secret = st.secrets["App_secret"]["app_secret"]
+    app_key = st.secrets["dropbox"]["app_key"]
+    app_secret = st.secrets["dropbox"]["app_secret"]
     redirect_uri = "https://icofaxes.streamlit.app/"  # This should match your Dropbox app settings
 
     if st.button("Start OAuth Flow"):
