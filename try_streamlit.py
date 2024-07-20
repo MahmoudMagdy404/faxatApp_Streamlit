@@ -379,6 +379,7 @@ TOKEN_FILE_NAME = 'token.json'
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 
 def get_dropbox_client():
+    """Create and return a Dropbox client."""
     try:
         client = dropbox.Dropbox(DROPBOX_ACCESS_TOKEN)
         client.users_get_current_account()
@@ -388,36 +389,48 @@ def get_dropbox_client():
         return None
 
 def download_token_from_dropbox():
+    """Download the token file from Dropbox."""
     client = get_dropbox_client()
+    if client is None:
+        st.error("Cannot download token because Dropbox client is not authenticated.")
+        return False
+
     try:
-        # Download the token from Dropbox
         metadata, response = client.files_download(f'{TOKEN_FOLDER_PATH}/{TOKEN_FILE_NAME}')
         with open(TOKEN_FILE_NAME, 'wb') as f:
             f.write(response.content)
-        print('Token downloaded from Dropbox successfully!')
+        st.success('Token downloaded from Dropbox successfully!')
+        return True
     except AuthError as e:
-        print(f'Error downloading token: {e}')
+        st.error(f'Error downloading token: {e}')
+        return False
     except dropbox.exceptions.ApiError as e:
-        print(f'File not found: {e}')
+        st.error(f'File not found: {e}')
+        return False
 
 def upload_token_to_dropbox():
+    """Upload the token file to Dropbox."""
     client = get_dropbox_client()
+    if client is None:
+        st.error("Cannot upload token because Dropbox client is not authenticated.")
+        return False
+
     try:
         with open(TOKEN_FILE_NAME, 'rb') as f:
             token_data = f.read()
-        # Upload token to Dropbox
         client.files_upload(token_data, f'{TOKEN_FOLDER_PATH}/{TOKEN_FILE_NAME}', mode=dropbox.files.WriteMode('overwrite'))
-        print('Token uploaded to Dropbox successfully!')
+        st.success('Token uploaded to Dropbox successfully!')
+        return True
     except AuthError as e:
-        print(f'Error uploading token: {e}')
+        st.error(f'Error uploading token: {e}')
+        return False
 
 def get_credentials():
+    """Get Google Drive credentials, refreshing or creating them as necessary."""
     creds = None
 
     # Download token from Dropbox if it exists
-    download_token_from_dropbox()
-
-    if os.path.exists(TOKEN_FILE_NAME):
+    if download_token_from_dropbox() and os.path.exists(TOKEN_FILE_NAME):
         creds = Credentials.from_authorized_user_file(TOKEN_FILE_NAME, SCOPES)
     
     if not creds or not creds.valid:
@@ -430,14 +443,14 @@ def get_credentials():
                 
             flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
             creds = flow.run_local_server(port=0)
+            
             with open(TOKEN_FILE_NAME, 'w') as token:
                 token.write(creds.to_json())
             
-            # Upload the new token to Dropbox
-            upload_token_to_dropbox()
-
+            if not upload_token_to_dropbox():
+                st.warning("Failed to upload token to Dropbox. Using local token only.")
+    
     return creds
-
 def get_drive_service(creds):
     return build("drive", "v3", credentials=creds)
 
