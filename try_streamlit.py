@@ -380,18 +380,6 @@ TOKEN_FILE_NAME = 'token.json'
 
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 
-def get_dropbox_client():
-    if not is_token_valid():
-        if not refresh_access_token():
-            return None
-    
-    try:
-        client = Dropbox(st.session_state.dropbox_access_token)
-        client.users_get_current_account()  # Test the connection
-        return client
-    except AuthError:
-        st.error("Dropbox authentication failed. Please try refreshing the token.")
-        return None
 
 def manual_dropbox_token_refresh():
     st.write("Please follow these steps to refresh your Dropbox token:")
@@ -559,12 +547,6 @@ def get_drive_service(creds):
     return build("drive", "v3", credentials=creds)
 
 def combine_pdfs(fname):
-    if not is_token_valid():
-        if not refresh_access_token():
-            st.error("Unable to refresh Dropbox token. Please try manual authentication.")
-            manual_dropbox_token_refresh()
-            return None, "Failed to obtain valid Dropbox token."
-        
     creds = get_credentials()
     if not creds:
         return None, "Failed to obtain valid credentials. Please try authenticating again."
