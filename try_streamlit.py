@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 import os
 import time
 import pandas as pd
@@ -26,7 +26,6 @@ from dropbox.exceptions import AuthError, ApiError
 from dropbox.files import WriteMode
 from google_auth_oauthlib.flow import InstalledAppFlow
 from dropbox import DropboxOAuth2Flow
-from dropbox import Dropbox
 
 
 # Define the braces and their forms
@@ -380,7 +379,6 @@ TOKEN_FILE_NAME = 'token.json'
 
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 
-
 def manual_dropbox_token_refresh():
     st.write("Please follow these steps to refresh your Dropbox token:")
     st.write("1. Click the 'Start OAuth Flow' button below.")
@@ -388,9 +386,16 @@ def manual_dropbox_token_refresh():
     st.write("3. Copy the authorization code provided by Dropbox.")
     st.write("4. Paste the code in the text box below and click 'Submit'.")
 
-    app_key = st.secrets["dropbox"]["app_key"]
-    app_secret = st.secrets["dropbox"]["app_secret"]
-    redirect_uri = "https://icofaxes.streamlit.app/"
+    # Safely get secrets
+    dropbox_secrets = st.secrets.get("dropbox", {})
+    app_key = dropbox_secrets.get("app_key")
+    app_secret = dropbox_secrets.get("app_secret")
+    
+    if not app_key or not app_secret:
+        st.error("Dropbox app key or secret is missing. Please check your secrets configuration.")
+        return
+
+    redirect_uri = "http://localhost:8501"  # This should match your Dropbox app settings
 
     if st.button("Start OAuth Flow"):
         try:
@@ -418,12 +423,10 @@ def manual_dropbox_token_refresh():
             )
             oauth_result = auth_flow.finish(auth_code)
             new_access_token = oauth_result.access_token
-            new_refresh_token = oauth_result.refresh_token
             
-            # Update the token and refresh token in Streamlit secrets
+            # Update the token in Streamlit secrets
             st.secrets["dropbox"]["access_token"] = new_access_token
-            st.secrets["dropbox"]["refresh_token"] = new_refresh_token
-            st.success("Dropbox token and refresh token updated successfully!")
+            st.success("Dropbox token updated successfully!")
         except Exception as e:
             st.error(f"Failed to refresh Dropbox token: {e}")
             
@@ -443,7 +446,6 @@ def get_dropbox_client():
             st.error("Dropbox authentication error. Please check your access token.")
         return None
 
-# Function to update Dropbox token
 def update_dropbox_token():
     new_token = st.text_input("Enter new Dropbox access token:", type="password")
     if st.button("Update Token") and new_token:
@@ -452,7 +454,6 @@ def update_dropbox_token():
         return new_token
     return None
 
-# Function to download token from Dropbox
 def download_token_from_dropbox():
     client = get_dropbox_client()
     if client is None:
@@ -464,7 +465,7 @@ def download_token_from_dropbox():
             f.write(response.content)
         print('Token downloaded from Dropbox successfully!')
         return True
-    except dropbox.exceptions.ApiError as e:
+    except ApiError as e:
         if e.error.is_path() and e.error.get_path().is_not_found():
             st.warning(f'Token file not found in Dropbox: {TOKEN_FOLDER_PATH}/{TOKEN_FILE_NAME}')
         else:
@@ -474,7 +475,6 @@ def download_token_from_dropbox():
     
     return False
 
-# Function to upload token to Dropbox
 def upload_token_to_dropbox(token_data):
     client = get_dropbox_client()
     if client is None:
@@ -489,12 +489,6 @@ def upload_token_to_dropbox(token_data):
         return False
 # Function to get Google Drive credentials
 def get_credentials():
-    # First, ensure Dropbox token is refreshed
-    dropbox_client = get_dropbox_client()
-    if not dropbox_client:
-        st.error("Failed to authenticate with Dropbox. This may affect file operations.")
-    
-    # Now proceed with Google Drive authentication
     creds = None
 
     # Try to download token from Dropbox
@@ -593,8 +587,8 @@ def main():
     # Sidebar navigation
     st.sidebar.title("Navigation")
     page = st.sidebar.radio("Go to", ["Form Submission", "Send Fax", "Sent Faxes List"])
-    if st.sidebar.button("Refresh Dropbox Token"):
-        manual_dropbox_token_refresh()
+    # if st.sidebar.button("Refresh Dropbox Token"):
+    #     manual_dropbox_token_refresh()
     # Adding a note in the sidebar
     st.sidebar.markdown("---")
     st.sidebar.markdown("### Ankle States → L1906")
@@ -750,6 +744,14 @@ def main():
             else:
                 st.warning("Please enter a doctor name for PDF combination.")
 
+        if 'combined_pdf' in st.session_state:
+            st.download_button(
+                label="Download Combined PDF",
+                data=st.session_state['combined_pdf'].getvalue(),
+                file_name=f"{st.session_state['doctor_name']}_combined.pdf",
+                mime="application/pdf"
+            )
+            st.success("Combined PDF is ready for further processing (e.g., sending faxes).")
 
 
         st.subheader("Select Fax Service")
