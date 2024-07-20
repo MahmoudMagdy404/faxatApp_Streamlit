@@ -394,7 +394,7 @@ def manual_dropbox_token_refresh():
         st.error("Dropbox app key or secret is missing. Please check your secrets configuration.")
         return
 
-    redirect_uri = "http://localhost:8501"  # This should match your Dropbox app settings
+    redirect_uri = "https://icofaxes.streamlit.app/"  # This should match your Dropbox app settings
 
     if st.button("Start OAuth Flow"):
         try:
@@ -442,7 +442,47 @@ def manual_dropbox_token_refresh():
         except Exception as e:
             st.error(f"Failed to refresh Dropbox token: {e}")
 
-def refresh_dropbox_access_token():
+def obtain_initial_refresh_token():
+    dropbox_secrets = st.secrets.get("dropbox", {})
+    app_key = dropbox_secrets.get("app_key")
+    app_secret = dropbox_secrets.get("app_secret")
+    
+    if not app_key or not app_secret:
+        st.error("Dropbox app key or secret is missing. Please check your secrets configuration.")
+        return None
+
+    url = "https://api.dropboxapi.com/oauth2/token"
+    data = {
+        "grant_type": "authorization_code",
+        "code": st.text_input("Enter the authorization code:"),
+        "client_id": app_key,
+        "client_secret": app_secret
+    }
+    
+    try:
+        response = requests.post(url, data=data)
+        response.raise_for_status()
+        token_data = response.json()
+        
+        access_token = token_data.get("access_token")
+        refresh_token = token_data.get("refresh_token")
+        
+        if refresh_token:
+            st.secrets["dropbox"]["refresh_token"] = refresh_token
+            st.secrets["dropbox"]["access_token"] = access_token
+            update_secrets_file(app_key, app_secret, access_token, refresh_token)
+            st.success("Refresh token obtained and saved successfully!")
+            return refresh_token
+        else:
+            st.error("Failed to obtain refresh token.")
+            return None
+    except requests.exceptions.RequestException as e:
+        st.error(f"Failed to obtain refresh token: {e}")
+        if hasattr(e, 'response') and hasattr(e.response, 'text'):
+            st.error(f"Response content: {e.response.text}")
+        return None
+
+def refresh_access_token():
     dropbox_secrets = st.secrets.get("dropbox", {})
     app_key = dropbox_secrets.get("app_key")
     app_secret = dropbox_secrets.get("app_secret")
@@ -455,9 +495,9 @@ def refresh_dropbox_access_token():
     url = "https://api.dropboxapi.com/oauth2/token"
     data = {
         "grant_type": "refresh_token",
+        "refresh_token": refresh_token,
         "client_id": app_key,
-        "client_secret": app_secret,
-        "refresh_token": refresh_token
+        "client_secret": app_secret
     }
     
     try:
@@ -466,16 +506,11 @@ def refresh_dropbox_access_token():
         token_data = response.json()
         
         new_access_token = token_data.get("access_token")
-        new_refresh_token = token_data.get("refresh_token", refresh_token)
         
         if new_access_token:
             st.secrets["dropbox"]["access_token"] = new_access_token
-            st.secrets["dropbox"]["refresh_token"] = new_refresh_token
-            
-            # Update the .streamlit/secrets.toml file
-            update_secrets_file(app_key, app_secret, new_access_token, new_refresh_token)
-            
-            st.success("Dropbox token refreshed successfully!")
+            update_secrets_file(app_key, app_secret, new_access_token, refresh_token)
+            st.success("Access token refreshed successfully!")
             return new_access_token
         else:
             st.error("Failed to obtain new access token.")
@@ -506,7 +541,7 @@ def get_dropbox_client():
         return client
     except AuthError:
         st.warning("Dropbox token has expired. Attempting to refresh...")
-        new_token = refresh_dropbox_access_token()
+        new_token = refresh_access_token()
         if new_token:
             client = Dropbox(new_token)
             return client
@@ -514,8 +549,9 @@ def get_dropbox_client():
             st.error("Failed to refresh Dropbox token. Please check your app configuration.")
             return None
     except Exception as e:
-        st.error(f"Unexpected error: {e}")
+        st.error(f"Unexpected error with Dropbox: {e}")
         return None
+
 def download_token_from_dropbox():
     client = get_dropbox_client()
     if client is None:
@@ -550,8 +586,13 @@ def upload_token_to_dropbox(token_data):
         st.error(f'Error uploading token to Dropbox: {e}')
         return False
 
-# Function to get Google Drive credentials
 def get_credentials():
+    # First, ensure Dropbox token is refreshed
+    dropbox_client = get_dropbox_client()
+    if not dropbox_client:
+        st.error("Failed to authenticate with Dropbox. This may affect file operations.")
+    
+    # Now proceed with Google Drive authentication
     creds = None
 
     # Try to download token from Dropbox
@@ -814,6 +855,7 @@ def main():
                 mime="application/pdf"
             )
             st.success("Combined PDF is ready for further processing (e.g., sending faxes).")
+
 
 
         st.subheader("Select Fax Service")
