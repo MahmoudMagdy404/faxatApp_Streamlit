@@ -426,34 +426,7 @@ def manual_dropbox_token_refresh():
             st.success("Dropbox token and refresh token updated successfully!")
         except Exception as e:
             st.error(f"Failed to refresh Dropbox token: {e}")
-
-def refresh_dropbox_access_token():
-    dropbox_secrets = st.secrets.get("dropbox", {})
-    app_key = dropbox_secrets.get("app_key")
-    app_secret = dropbox_secrets.get("app_secret")
-    refresh_token = dropbox_secrets.get("refresh_token")
-    
-    if not app_key or not app_secret or not refresh_token:
-        st.error("Dropbox app key, secret, or refresh token is missing. Please check your secrets configuration.")
-        return None
-
-    url = "https://api.dropbox.com/oauth2/token"
-    data = {
-        "grant_type": "refresh_token",
-        "refresh_token": refresh_token,
-        "client_id": app_key,
-        "client_secret": app_secret
-    }
-    
-    response = requests.post(url, data=data)
-    if response.status_code == 200:
-        new_access_token = response.json().get("access_token")
-        st.secrets["dropbox"]["access_token"] = new_access_token
-        return new_access_token
-    else:
-        st.error(f"Failed to refresh access token: {response.text}")
-        return None
-
+            
 def get_dropbox_client():
     try:
         client = dropbox.Dropbox(st.secrets["dropbox"]["access_token"])
@@ -462,7 +435,7 @@ def get_dropbox_client():
     except dropbox.exceptions.AuthError as e:
         if "ExpiredAccessToken" in str(e):
             st.error("Dropbox token has expired.")
-            new_token = refresh_dropbox_access_token()
+            new_token = update_dropbox_token()
             if new_token:
                 client = dropbox.Dropbox(new_token)
                 return client
@@ -470,6 +443,16 @@ def get_dropbox_client():
             st.error("Dropbox authentication error. Please check your access token.")
         return None
 
+# Function to update Dropbox token
+def update_dropbox_token():
+    new_token = st.text_input("Enter new Dropbox access token:", type="password")
+    if st.button("Update Token") and new_token:
+        st.session_state["new_dropbox_token"] = new_token  # Temporary storage
+        st.success("Dropbox token updated successfully!")
+        return new_token
+    return None
+
+# Function to download token from Dropbox
 def download_token_from_dropbox():
     client = get_dropbox_client()
     if client is None:
@@ -491,6 +474,7 @@ def download_token_from_dropbox():
     
     return False
 
+# Function to upload token to Dropbox
 def upload_token_to_dropbox(token_data):
     client = get_dropbox_client()
     if client is None:
@@ -503,7 +487,7 @@ def upload_token_to_dropbox(token_data):
     except Exception as e:
         st.error(f'Error uploading token to Dropbox: {e}')
         return False
-
+# Function to get Google Drive credentials
 def get_credentials():
     # First, ensure Dropbox token is refreshed
     dropbox_client = get_dropbox_client()
@@ -609,8 +593,8 @@ def main():
     # Sidebar navigation
     st.sidebar.title("Navigation")
     page = st.sidebar.radio("Go to", ["Form Submission", "Send Fax", "Sent Faxes List"])
-    # if st.sidebar.button("Refresh Dropbox Token"):
-    #     manual_dropbox_token_refresh()
+    if st.sidebar.button("Refresh Dropbox Token"):
+        manual_dropbox_token_refresh()
     # Adding a note in the sidebar
     st.sidebar.markdown("---")
     st.sidebar.markdown("### Ankle States → L1906")
