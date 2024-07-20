@@ -373,10 +373,8 @@ def on_row_select():
         st.session_state['selected_fax_info'] = "No fax selected"
 
 # Dropbox settings
-DROPBOX_ACCESS_TOKEN = st.secrets["dropbox"]["access_token"]
 TOKEN_FOLDER_PATH = '/Apps/faxat app' 
 TOKEN_FILE_NAME = 'token.json'
-
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 
 def manual_dropbox_token_refresh():
@@ -423,13 +421,42 @@ def manual_dropbox_token_refresh():
             )
             oauth_result = auth_flow.finish(auth_code)
             new_access_token = oauth_result.access_token
+            new_refresh_token = oauth_result.refresh_token
             
-            # Update the token in Streamlit secrets
+            # Update the token and refresh token in Streamlit secrets
             st.secrets["dropbox"]["access_token"] = new_access_token
-            st.success("Dropbox token updated successfully!")
+            st.secrets["dropbox"]["refresh_token"] = new_refresh_token
+            st.success("Dropbox token and refresh token updated successfully!")
         except Exception as e:
             st.error(f"Failed to refresh Dropbox token: {e}")
-            
+
+def refresh_dropbox_access_token():
+    dropbox_secrets = st.secrets.get("dropbox", {})
+    app_key = dropbox_secrets.get("app_key")
+    app_secret = dropbox_secrets.get("app_secret")
+    refresh_token = dropbox_secrets.get("refresh_token")
+    
+    if not app_key or not app_secret or not refresh_token:
+        st.error("Dropbox app key, secret, or refresh token is missing. Please check your secrets configuration.")
+        return None
+
+    url = "https://api.dropbox.com/oauth2/token"
+    data = {
+        "grant_type": "refresh_token",
+        "refresh_token": refresh_token,
+        "client_id": app_key,
+        "client_secret": app_secret
+    }
+    
+    response = requests.post(url, data=data)
+    if response.status_code == 200:
+        new_access_token = response.json().get("access_token")
+        st.secrets["dropbox"]["access_token"] = new_access_token
+        return new_access_token
+    else:
+        st.error(f"Failed to refresh access token: {response.text}")
+        return None
+
 def get_dropbox_client():
     try:
         client = dropbox.Dropbox(st.secrets["dropbox"]["access_token"])
@@ -438,21 +465,13 @@ def get_dropbox_client():
     except dropbox.exceptions.AuthError as e:
         if "ExpiredAccessToken" in str(e):
             st.error("Dropbox token has expired.")
-            new_token = update_dropbox_token()
+            new_token = refresh_dropbox_access_token()
             if new_token:
                 client = dropbox.Dropbox(new_token)
                 return client
         else:
             st.error("Dropbox authentication error. Please check your access token.")
         return None
-
-def update_dropbox_token():
-    new_token = st.text_input("Enter new Dropbox access token:", type="password")
-    if st.button("Update Token") and new_token:
-        st.session_state["new_dropbox_token"] = new_token  # Temporary storage
-        st.success("Dropbox token updated successfully!")
-        return new_token
-    return None
 
 def download_token_from_dropbox():
     client = get_dropbox_client()
@@ -463,7 +482,7 @@ def download_token_from_dropbox():
         metadata, response = client.files_download(f'{TOKEN_FOLDER_PATH}/{TOKEN_FILE_NAME}')
         with open(TOKEN_FILE_NAME, 'wb') as f:
             f.write(response.content)
-        print('Token downloaded from Dropbox successfully!')
+        st.success('Token downloaded from Dropbox successfully!')
         return True
     except dropbox.exceptions.ApiError as e:
         if e.error.is_path() and e.error.get_path().is_not_found():
@@ -482,7 +501,7 @@ def upload_token_to_dropbox(token_data):
 
     try:
         client.files_upload(token_data, f'{TOKEN_FOLDER_PATH}/{TOKEN_FILE_NAME}', mode=dropbox.files.WriteMode('overwrite'))
-        print('Token uploaded to Dropbox successfully!')
+        st.success('Token uploaded to Dropbox successfully!')
         return True
     except Exception as e:
         st.error(f'Error uploading token to Dropbox: {e}')
@@ -520,7 +539,6 @@ def get_credentials():
             st.warning("Failed to upload token to Dropbox. Using local token only.")
 
     return creds
-
 # Function to get Google Drive service
 def get_drive_service(creds):
     return build("drive", "v3", credentials=creds)
