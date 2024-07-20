@@ -393,7 +393,7 @@ def manual_dropbox_token_refresh():
         st.error("Dropbox app key or secret is missing. Please check your secrets configuration.")
         return
 
-    redirect_uri = "https://icofaxes.streamlit.app/"  # This should match your Dropbox app settings
+    redirect_uri = "http://localhost:8501"  # This should match your Dropbox app settings
 
     if st.button("Start OAuth Flow"):
         try:
@@ -426,6 +426,17 @@ def manual_dropbox_token_refresh():
             # Update the token and refresh token in Streamlit secrets
             st.secrets["dropbox"]["access_token"] = new_access_token
             st.secrets["dropbox"]["refresh_token"] = new_refresh_token
+            new_secrets = {
+                "dropbox_app_key": app_key,
+                "dropbox_app_secret": app_secret,
+                "dropbox_refresh_token": new_refresh_token,
+                "dropbox_access_token": new_access_token,
+            }
+
+            with open(".streamlit/secrets.toml", "w") as secrets_file:
+                secrets_file.write("[secrets]\n")
+                for key, value in new_secrets.items():
+                    secrets_file.write(f"{key} = \"{value}\"\n")
             st.success("Dropbox token and refresh token updated successfully!")
         except Exception as e:
             st.error(f"Failed to refresh Dropbox token: {e}")
@@ -464,13 +475,19 @@ def get_dropbox_client():
         return client
     except dropbox.exceptions.AuthError as e:
         if "ExpiredAccessToken" in str(e):
-            st.error("Dropbox token has expired.")
+            st.warning("Dropbox token has expired. Attempting to refresh...")
             new_token = refresh_dropbox_access_token()
             if new_token:
                 client = dropbox.Dropbox(new_token)
                 return client
+            else:
+                st.error("Failed to refresh token automatically. Manual refresh may be required.")
+                return None
         else:
             st.error("Dropbox authentication error. Please check your access token.")
+            return None
+    except Exception as e:
+        st.error(f"Unexpected error: {e}")
         return None
 
 def download_token_from_dropbox():
