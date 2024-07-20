@@ -22,10 +22,9 @@ import io
 import json
 from google.auth.transport.requests import Request
 import dropbox
-from dropbox.exceptions import AuthError, ApiError
+from dropbox.exceptions import AuthError
 from dropbox.files import WriteMode
 from google_auth_oauthlib.flow import InstalledAppFlow
-from dropbox import DropboxOAuth2Flow
 
 
 # Define the braces and their forms
@@ -379,148 +378,66 @@ TOKEN_FILE_NAME = 'token.json'
 
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 
-def manual_dropbox_token_refresh():
-    st.write("Please follow these steps to refresh your Dropbox token:")
-    st.write("1. Click the 'Start OAuth Flow' button below.")
-    st.write("2. You'll be redirected to Dropbox. Log in and authorize the app.")
-    st.write("3. Copy the authorization code provided by Dropbox.")
-    st.write("4. Paste the code in the text box below and click 'Submit'.")
-
-    # Safely get secrets
-    dropbox_secrets = st.secrets.get("dropbox", {})
-    app_key = dropbox_secrets.get("app_key")
-    app_secret = dropbox_secrets.get("app_secret")
-    
-    if not app_key or not app_secret:
-        st.error("Dropbox app key or secret is missing. Please check your secrets configuration.")
-        return
-
-    redirect_uri = "http://localhost:8501"  # This should match your Dropbox app settings
-
-    if st.button("Start OAuth Flow"):
-        try:
-            auth_flow = DropboxOAuth2Flow(
-                app_key,
-                app_secret,
-                redirect_uri,
-                st.session_state,
-                "dropbox-auth-csrf-token"
-            )
-            authorize_url = auth_flow.start()
-            st.write(f"Please visit this URL to authorize the app: {authorize_url}")
-        except Exception as e:
-            st.error(f"Error starting OAuth flow: {e}")
-
-    auth_code = st.text_input("Enter the authorization code:")
-    if st.button("Submit") and auth_code:
-        try:
-            auth_flow = DropboxOAuth2Flow(
-                app_key,
-                app_secret,
-                redirect_uri,
-                st.session_state,
-                "dropbox-auth-csrf-token"
-            )
-            oauth_result = auth_flow.finish(auth_code)
-            new_access_token = oauth_result.access_token
-            
-            # Update the token in Streamlit secrets
-            st.secrets["dropbox"]["access_token"] = new_access_token
-            st.success("Dropbox token updated successfully!")
-        except Exception as e:
-            st.error(f"Failed to refresh Dropbox token: {e}")
-            
 def get_dropbox_client():
     try:
-        client = dropbox.Dropbox(st.secrets["dropbox"]["access_token"])
-        client.users_get_current_account()  # Test the connection
+        client = dropbox.Dropbox(DROPBOX_ACCESS_TOKEN)
+        client.users_get_current_account()
         return client
-    except dropbox.exceptions.AuthError as e:
-        if "ExpiredAccessToken" in str(e):
-            st.error("Dropbox token has expired.")
-            new_token = update_dropbox_token()
-            if new_token:
-                client = dropbox.Dropbox(new_token)
-                return client
-        else:
-            st.error("Dropbox authentication error. Please check your access token.")
+    except dropbox.exceptions.AuthError:
+        st.error("Dropbox authentication error. Please check your access token.")
         return None
-
-def update_dropbox_token():
-    new_token = st.text_input("Enter new Dropbox access token:", type="password")
-    if st.button("Update Token") and new_token:
-        st.session_state["new_dropbox_token"] = new_token  # Temporary storage
-        st.success("Dropbox token updated successfully!")
-        return new_token
-    return None
 
 def download_token_from_dropbox():
     client = get_dropbox_client()
-    if client is None:
-        return False
-
     try:
+        # Download the token from Dropbox
         metadata, response = client.files_download(f'{TOKEN_FOLDER_PATH}/{TOKEN_FILE_NAME}')
         with open(TOKEN_FILE_NAME, 'wb') as f:
             f.write(response.content)
         print('Token downloaded from Dropbox successfully!')
-        return True
-    except ApiError as e:
-        if e.error.is_path() and e.error.get_path().is_not_found():
-            st.warning(f'Token file not found in Dropbox: {TOKEN_FOLDER_PATH}/{TOKEN_FILE_NAME}')
-        else:
-            st.error(f'Dropbox API error: {e}')
-    except Exception as e:
-        st.error(f'Unexpected error downloading token: {e}')
-    
-    return False
+    except AuthError as e:
+        print(f'Error downloading token: {e}')
+    except dropbox.exceptions.ApiError as e:
+        print(f'File not found: {e}')
 
-def upload_token_to_dropbox(token_data):
+def upload_token_to_dropbox():
     client = get_dropbox_client()
-    if client is None:
-        return False
-
     try:
+        with open(TOKEN_FILE_NAME, 'rb') as f:
+            token_data = f.read()
+        # Upload token to Dropbox
         client.files_upload(token_data, f'{TOKEN_FOLDER_PATH}/{TOKEN_FILE_NAME}', mode=dropbox.files.WriteMode('overwrite'))
         print('Token uploaded to Dropbox successfully!')
-        return True
-    except Exception as e:
-        st.error(f'Error uploading token to Dropbox: {e}')
-        return False
-# Function to get Google Drive credentials
+    except AuthError as e:
+        print(f'Error uploading token: {e}')
+
 def get_credentials():
     creds = None
 
-    # Try to download token from Dropbox
-    if download_token_from_dropbox():
-        # If download successful, load credentials from the file
+    # Download token from Dropbox if it exists
+    download_token_from_dropbox()
+
+    if os.path.exists(TOKEN_FILE_NAME):
         creds = Credentials.from_authorized_user_file(TOKEN_FILE_NAME, SCOPES)
     
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            # If no valid credentials, create new ones
             credentials_json = st.secrets["google_credentials"]["credentials_json"]
             with open('credentials.json', 'w') as f:
                 f.write(credentials_json)
-            
+                
             flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
             creds = flow.run_local_server(port=0)
-        
-        # Save the credentials for future use
-        with open(TOKEN_FILE_NAME, 'w') as token:
-            token.write(creds.to_json())
-        
-        # Upload the new token to Dropbox
-        with open(TOKEN_FILE_NAME, 'rb') as f:
-            token_data = f.read()
-        if not upload_token_to_dropbox(token_data):
-            st.warning("Failed to upload token to Dropbox. Using local token only.")
+            with open(TOKEN_FILE_NAME, 'w') as token:
+                token.write(creds.to_json())
+            
+            # Upload the new token to Dropbox
+            upload_token_to_dropbox()
 
     return creds
 
-# Function to get Google Drive service
 def get_drive_service(creds):
     return build("drive", "v3", credentials=creds)
 
@@ -587,8 +504,6 @@ def main():
     # Sidebar navigation
     st.sidebar.title("Navigation")
     page = st.sidebar.radio("Go to", ["Form Submission", "Send Fax", "Sent Faxes List"])
-    # if st.sidebar.button("Refresh Dropbox Token"):
-    #     manual_dropbox_token_refresh()
     # Adding a note in the sidebar
     st.sidebar.markdown("---")
     st.sidebar.markdown("### Ankle States → L1906")
