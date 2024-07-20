@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import os
 import time
 import pandas as pd
@@ -378,6 +378,19 @@ TOKEN_FOLDER_PATH = '/Apps/faxat app'
 TOKEN_FILE_NAME = 'token.json'
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 
+def get_dropbox_client():
+    if not is_token_valid():
+        if not refresh_access_token():
+            return None
+    
+    try:
+        client = Dropbox(st.session_state.dropbox_access_token)
+        client.users_get_current_account()  # Test the connection
+        return client
+    except AuthError:
+        st.error("Dropbox authentication failed. Please try refreshing the token.")
+        return None
+
 def manual_dropbox_token_refresh():
     st.write("Please follow these steps to refresh your Dropbox token:")
     st.write("1. Click the 'Start OAuth Flow' button below.")
@@ -385,16 +398,9 @@ def manual_dropbox_token_refresh():
     st.write("3. Copy the authorization code provided by Dropbox.")
     st.write("4. Paste the code in the text box below and click 'Submit'.")
 
-    # Safely get secrets
-    dropbox_secrets = st.secrets.get("dropbox", {})
-    app_key = dropbox_secrets.get("app_key")
-    app_secret = dropbox_secrets.get("app_secret")
-    
-    if not app_key or not app_secret:
-        st.error("Dropbox app key or secret is missing. Please check your secrets configuration.")
-        return
-
-    redirect_uri = "https://icofaxes.streamlit.app/"  # This should match your Dropbox app settings
+    app_key = st.secrets["dropbox"]["app_key"]
+    app_secret = st.secrets["dropbox"]["app_secret"]
+    redirect_uri = "https://icofaxes.streamlit.app/"
 
     if st.button("Start OAuth Flow"):
         try:
@@ -421,27 +427,13 @@ def manual_dropbox_token_refresh():
                 "dropbox-auth-csrf-token"
             )
             oauth_result = auth_flow.finish(auth_code)
-            new_access_token = oauth_result.access_token
-            new_refresh_token = oauth_result.refresh_token
+            st.session_state.dropbox_access_token = oauth_result.access_token
+            st.session_state.dropbox_refresh_token = oauth_result.refresh_token
+            st.session_state.dropbox_token_expiry = datetime.now() + timedelta(seconds=oauth_result.expires_in)
             
-            # Update the token and refresh token in Streamlit secrets
-            st.secrets["dropbox"]["access_token"] = new_access_token
-            st.secrets["dropbox"]["refresh_token"] = new_refresh_token
-            new_secrets = {
-                "dropbox_app_key": app_key,
-                "dropbox_app_secret": app_secret,
-                "dropbox_refresh_token": new_refresh_token,
-                "dropbox_access_token": new_access_token,
-            }
-
-            with open(".streamlit/secrets.toml", "w") as secrets_file:
-                secrets_file.write("[secrets]\n")
-                for key, value in new_secrets.items():
-                    secrets_file.write(f"{key} = \"{value}\"\n")
             st.success("Dropbox token and refresh token updated successfully!")
         except Exception as e:
             st.error(f"Failed to refresh Dropbox token: {e}")
-
 def obtain_initial_refresh_token():
     dropbox_secrets = st.secrets.get("dropbox", {})
     app_key = dropbox_secrets.get("app_key")
@@ -483,43 +475,35 @@ def obtain_initial_refresh_token():
         return None
 
 def refresh_access_token():
-    dropbox_secrets = st.secrets.get("dropbox", {})
-    app_key = dropbox_secrets.get("app_key")
-    app_secret = dropbox_secrets.get("app_secret")
-    refresh_token = dropbox_secrets.get("refresh_token")
-    
-    if not app_key or not app_secret or not refresh_token:
-        st.error("Dropbox app key, secret, or refresh token is missing. Please check your secrets configuration.")
-        return None
+    if 'dropbox_refresh_token' not in st.session_state:
+        st.error("No refresh token available. Please authenticate with Dropbox.")
+        return False
 
-    url = "https://api.dropboxapi.com/oauth2/token"
-    data = {
-        "grant_type": "refresh_token",
-        "refresh_token": refresh_token,
-        "client_id": app_key,
-        "client_secret": app_secret
-    }
-    
     try:
+        url = "https://api.dropboxapi.com/oauth2/token"
+        data = {
+            "grant_type": "refresh_token",
+            "refresh_token": st.session_state.dropbox_refresh_token,
+            "client_id": st.secrets["dropbox"]["app_key"],
+            "client_secret": st.secrets["dropbox"]["app_secret"]
+        }
         response = requests.post(url, data=data)
         response.raise_for_status()
         token_data = response.json()
         
-        new_access_token = token_data.get("access_token")
+        st.session_state.dropbox_access_token = token_data["access_token"]
+        st.session_state.dropbox_token_expiry = datetime.now() + timedelta(seconds=token_data["expires_in"])
         
-        if new_access_token:
-            st.secrets["dropbox"]["access_token"] = new_access_token
-            update_secrets_file(app_key, app_secret, new_access_token, refresh_token)
-            st.success("Access token refreshed successfully!")
-            return new_access_token
-        else:
-            st.error("Failed to obtain new access token.")
-            return None
-    except requests.exceptions.RequestException as e:
-        st.error(f"Failed to refresh access token: {e}")
-        if hasattr(e, 'response') and hasattr(e.response, 'text'):
-            st.error(f"Response content: {e.response.text}")
-        return None
+        st.success("Dropbox token refreshed successfully!")
+        return True
+    except Exception as e:
+        st.error(f"Failed to refresh Dropbox token: {e}")
+        return False
+
+def is_token_valid():
+    return ('dropbox_access_token' in st.session_state and
+            'dropbox_token_expiry' in st.session_state and
+            datetime.now() < st.session_state.dropbox_token_expiry)
 
 def update_secrets_file(app_key, app_secret, access_token, refresh_token):
     secrets_path = ".streamlit/secrets.toml"
@@ -534,23 +518,6 @@ refresh_token = "{refresh_token}"
     with open(secrets_path, "w") as secrets_file:
         secrets_file.write(secrets_content)
 
-def get_dropbox_client():
-    try:
-        client = Dropbox(st.secrets["dropbox"]["access_token"])
-        client.users_get_current_account()  # Test the connection
-        return client
-    except AuthError:
-        st.warning("Dropbox token has expired. Attempting to refresh...")
-        new_token = refresh_access_token()
-        if new_token:
-            client = Dropbox(new_token)
-            return client
-        else:
-            st.error("Failed to refresh Dropbox token. Please check your app configuration.")
-            return None
-    except Exception as e:
-        st.error(f"Unexpected error with Dropbox: {e}")
-        return None
 
 def download_token_from_dropbox():
     client = get_dropbox_client()
@@ -628,6 +595,12 @@ def get_drive_service(creds):
     return build("drive", "v3", credentials=creds)
 
 def combine_pdfs(fname):
+    if not is_token_valid():
+        if not refresh_access_token():
+            st.error("Unable to refresh Dropbox token. Please try manual authentication.")
+            manual_dropbox_token_refresh()
+            return None, "Failed to obtain valid Dropbox token."
+        
     creds = get_credentials()
     if not creds:
         return None, "Failed to obtain valid credentials. Please try authenticating again."
@@ -846,15 +819,6 @@ def main():
                         st.error("Failed to create combined PDF. Please try again.")
             else:
                 st.warning("Please enter a doctor name for PDF combination.")
-
-        if 'combined_pdf' in st.session_state:
-            st.download_button(
-                label="Download Combined PDF",
-                data=st.session_state['combined_pdf'].getvalue(),
-                file_name=f"{st.session_state['doctor_name']}_combined.pdf",
-                mime="application/pdf"
-            )
-            st.success("Combined PDF is ready for further processing (e.g., sending faxes).")
 
 
 
