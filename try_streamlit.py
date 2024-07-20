@@ -395,7 +395,7 @@ def manual_dropbox_token_refresh():
         st.error("Dropbox app key or secret is missing. Please check your secrets configuration.")
         return
 
-    redirect_uri = "http://localhost:8501"  # This should match your Dropbox app settings
+    redirect_uri = "https://icofaxes.streamlit.app/"  # This should match your Dropbox app settings
 
     if st.button("Start OAuth Flow"):
         try:
@@ -465,7 +465,7 @@ def download_token_from_dropbox():
             f.write(response.content)
         print('Token downloaded from Dropbox successfully!')
         return True
-    except ApiError as e:
+    except dropbox.exceptions.ApiError as e:
         if e.error.is_path() and e.error.get_path().is_not_found():
             st.warning(f'Token file not found in Dropbox: {TOKEN_FOLDER_PATH}/{TOKEN_FILE_NAME}')
         else:
@@ -487,6 +487,7 @@ def upload_token_to_dropbox(token_data):
     except Exception as e:
         st.error(f'Error uploading token to Dropbox: {e}')
         return False
+
 # Function to get Google Drive credentials
 def get_credentials():
     creds = None
