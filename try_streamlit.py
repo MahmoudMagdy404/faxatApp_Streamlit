@@ -235,12 +235,12 @@ def handle_faxplus(combined_pdf, receiver_number, fax_message, fax_subject, to_n
 
     # Prepare files
     files = []
-    
+
     # Handle combined PDF
     if isinstance(combined_pdf, io.BytesIO):
         encoded_combined_pdf = base64.b64encode(combined_pdf.getvalue()).decode()
         files.append({"name": "combined.pdf", "data": encoded_combined_pdf})
-    
+
     # Handle cover sheet if uploaded
     if uploaded_cover_sheet is not None:
         encoded_cover_sheet = base64.b64encode(uploaded_cover_sheet.read()).decode()
@@ -248,32 +248,29 @@ def handle_faxplus(combined_pdf, receiver_number, fax_message, fax_subject, to_n
 
     # Construct the payload
     payload = {
-        "userId": user_id,
-        "payloadOutbox": {
-            "comment": {
-                "tags": [fax_subject],
-                "text": fax_message
-            },
-            "files": files,
-            "from": "+16023469225",  # Using the caller_id from your original function
-            "options": {
-                "enhancement": True,
-                "retry": {
-                    "count": 0,
-                    "delay": 0
-                }
-            },
-            "send_time": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S %z"),
-            "to": [receiver_number],
-            "return_ids": True
-        }
+        "comment": {
+            "tags": [fax_subject],
+            "text": fax_message
+        },
+        "files": files,
+        "from": "+16023469225",  # Using the caller_id from your original function
+        "options": {
+            "enhancement": True,
+            "retry": {
+                "count": 0,
+                "delay": 0
+            }
+        },
+        "send_time": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S %z"),
+        "to": [receiver_number],
+        "return_ids": True
     }
 
     # Make the POST request
     response = requests.post(url, headers=headers, json=payload)
 
     # Check if the request was successful
-    if response.status_code == 200:
+    if response.status_code == 201:
         fax_response = response.json()
         print("Fax sent successfully:", fax_response)
         return True
@@ -281,7 +278,7 @@ def handle_faxplus(combined_pdf, receiver_number, fax_message, fax_subject, to_n
         print(f"Error sending fax: {response.status_code}")
         print(f"Response content: {response.text}")
         return False
-
+    
 def sanitize_filename(filename):
     return re.sub(r'[<>:"/\\|?*\x00-\x1F]', '', filename)
 
