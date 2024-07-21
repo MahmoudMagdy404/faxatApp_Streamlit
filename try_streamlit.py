@@ -216,7 +216,6 @@ def handle_hallofax(combined_pdf, receiver_number, fax_message, fax_subject, to_
     # Return True if successful, False otherwise
     return True
 #TODO -> Try to fix it
-
 def handle_faxplus(combined_pdf, receiver_number, fax_message, fax_subject, to_name, chaser_name, uploaded_cover_sheet):
     # Fax.Plus credentials
     access_token = st.secrets["faxplus_secret_key"]["secret_key"]
@@ -230,7 +229,8 @@ def handle_faxplus(combined_pdf, receiver_number, fax_message, fax_subject, to_n
     # Headers
     headers = {
         'Authorization': f'Bearer {access_token}',
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'x-fax-clientid': user_id,  # Added client ID to headers
     }
 
     # Prepare files
@@ -261,7 +261,7 @@ def handle_faxplus(combined_pdf, receiver_number, fax_message, fax_subject, to_n
                 "delay": 0
             }
         },
-        "send_time": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S %z"),
+        "send_time": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),  # Correct ISO 8601 format
         "to": [receiver_number],
         "return_ids": True
     }
@@ -517,7 +517,6 @@ TOKEN_FOLDER_ID = '1HDwNvgFv_DSEH2WKNfLNheKXxKT_hDM9'
 TOKEN_FILE_NAME = 'token.json'
 CREDENTIALS_FILE_NAME = 'credentials.json'
 SCOPES = ["https://www.googleapis.com/auth/drive"]
-
 def get_drive_service():
     creds = None
 
@@ -530,7 +529,7 @@ def get_drive_service():
         else:
             # Load client secrets
             with open(CREDENTIALS_FILE_NAME, 'r') as f:
-                credentials_json = f.read()
+                credentials_json = json.load(f)
             
             flow = InstalledAppFlow.from_client_config(
                 credentials_json, SCOPES
@@ -610,7 +609,7 @@ def get_credentials():
         else:
             # Load client secrets
             with open(CREDENTIALS_FILE_NAME, 'r') as f:
-                credentials_json = f.read()
+                credentials_json = json.load(f)
             
             flow = InstalledAppFlow.from_client_config(
                 credentials_json, SCOPES
