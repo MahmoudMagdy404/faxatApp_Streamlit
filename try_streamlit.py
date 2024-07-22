@@ -55,12 +55,12 @@ BracesForms = {
     }
 }
 chasers_dict = {
-    "Olivia":"(941) 293-1794" , "Mia":"(352) 718-1524",
-    "Lexi":"(607) 383-2941" , "Mark":"(754) 250-1426",
-    "Kendric":"(941) 293-1462" , "Ken":"(352) 718-1436",
-    "Anne":"(727) 910-2808" , "Linda":"(620) 203-2088",
-    "Tom":"(786) 891-7322" , "Rose":"(904) 515-1558",
-    "Emma":"(386) 487-2910" , "HANNAH":"(904) 515-1565",
+    "Olivia Smith":"(941) 293-1794" , "Mia Martin":"(352) 718-1524",
+    "Lexi Thomas":"(607) 383-2941" , "Mark Wilson":"(754) 250-1426",
+    "Kendrick Adams":"(941) 293-1462" , "Ken Adams":"(352) 718-1436",
+    "Anne Mathew":"(727) 910-2808" , "Linda Williams":"(620) 203-2088",
+    "Tom miles":"(786) 891-7322" , "Rose Johnson":"(904) 515-1558",
+    "Emma Winslet":"(386) 487-2910" , "Hannah Adams":"(904) 515-1565",
 }
 
 def handle_srfax(combined_pdf, receiver_number, fax_message, fax_subject, to_name, chaser_name, uploaded_cover_sheet):
