@@ -1,95 +1,118 @@
 import streamlit as st
-import requests
-import dropbox
-from dropbox.oauth import DropboxOAuth2Flow
-from datetime import datetime, timedelta
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.application import MIMEApplication
+from datetime import datetime
 
-# Dropbox credentials from Streamlit secrets
-app_key = st.secrets["dropbox"]["app_key"]
-app_secret = st.secrets["dropbox"]["app_secret"]
-redirect_uri = "https://your-streamlit-app-url"
-auth_flow = DropboxOAuth2Flow(app_key, app_secret, redirect_uri)
-
-# Initialize session state
-if 'dropbox_access_token' not in st.session_state:
-    st.session_state['dropbox_access_token'] = None
-if 'dropbox_refresh_token' not in st.session_state:
-    st.session_state['dropbox_refresh_token'] = None
-if 'dropbox_token_expiry' not in st.session_state:
-    st.session_state['dropbox_token_expiry'] = datetime.now()
-
-# Function to get Dropbox authorization URL
-def get_authorization_url():
-    return auth_flow.start()
-
-# Function to handle OAuth2 code exchange
-def handle_oauth_code(code):
+def handle_faxplus(uploaded_file, receiver_number, fax_message, fax_subject, to_name, chaser_name, sender_email, sender_password):
     try:
-        oauth_result = auth_flow.finish(code)
-        st.session_state.dropbox_access_token = oauth_result.access_token
-        st.session_state.dropbox_refresh_token = oauth_result.refresh_token
-        st.session_state.dropbox_token_expiry = datetime.now() + timedelta(seconds=oauth_result.expires_in)
-        st.success("Authorization successful!")
-    except Exception as e:
-        st.error(f"Failed to complete OAuth2 flow: {e}")
-
-# Function to refresh access token
-def refresh_access_token():
-    if 'dropbox_refresh_token' not in st.session_state or not st.session_state.dropbox_refresh_token:
-        st.error("No refresh token available.")
-        return False
-
-    try:
-        url = "https://api.dropboxapi.com/oauth2/token"
-        data = {
-            "grant_type": "refresh_token",
-            "refresh_token": st.session_state.dropbox_refresh_token,
-            "client_id": app_key,
-            "client_secret": app_secret
-        }
-        response = requests.post(url, data=data)
-        response.raise_for_status()
-        token_data = response.json()
+        # Create email
+        msg = MIMEMultipart()
+        msg['From'] = sender_email
+        msg['To'] = f"{receiver_number}@fax.plus"
+        msg['Subject'] = fax_subject
         
-        st.session_state.dropbox_access_token = token_data["access_token"]
-        st.session_state.dropbox_token_expiry = datetime.now() + timedelta(seconds=token_data["expires_in"])
-        st.success("Access token refreshed successfully!")
-        return True
+        # HTML email body
+        html_body = f"""
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Fax Cover Sheet</title>
+            <style>
+                body {{
+                    font-family: Arial, sans-serif;
+                    line-height: 1.6;
+                    margin: 0;
+                    padding: 20px;
+                }}
+                h1 {{
+                    font-size: 24px;
+                    margin-bottom: 20px;
+                }}
+                .section {{
+                    margin-bottom: 15px;
+                }}
+                .label {{
+                    font-weight: bold;
+                }}
+            </style>
+        </head>
+        <body>
+            <h1>FAX</h1>
+            <div class="section">
+                <div class="label">To:</div>
+                Name: {to_name},<br>
+                Fax number: {receiver_number}
+            </div>
+            <div class="section">
+                <div class="label">From:</div>
+                Name: {chaser_name},<br>
+                Fax number: {sender_email}
+            </div>
+            <div class="section">
+                <div class="label">Number of pages:</div>
+                2
+            </div>
+            <div class="section">
+                <div class="label">Subject:</div>
+                {fax_subject}
+            </div>
+            <div class="section">
+                <div class="label">Date:</div>
+                {datetime.now().strftime('%Y-%m-%d')}
+            </div>
+            <div class="section">
+                <div class="label">Message:</div>
+                <p>{fax_message}</p>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Add the HTML body as the cover sheet
+        body = MIMEText(html_body, 'html')
+        msg.attach(body)
+        
+        # # Attach the cover sheet if provided
+        # if uploaded_cover_sheet:
+        #     cover_sheet = MIMEApplication(uploaded_cover_sheet.getvalue())
+        #     cover_sheet.add_header('Content-Disposition', 'attachment; filename="cover_sheet.pdf"')
+        #     msg.attach(cover_sheet)
+
+        # Attach the main document
+        main_document = MIMEApplication(uploaded_file.getvalue())
+        main_document.add_header('Content-Disposition', 'attachment; filename="fax_document.pdf"')
+        msg.attach(main_document)
+        
+        # Send email
+        with smtplib.SMTP('smtp.gmail.com', 587) as server:
+            server.starttls()
+            server.login(sender_email, sender_password)
+            server.send_message(msg)
+        
+        st.success(f"Fax sent successfully to {receiver_number}")
+    
     except Exception as e:
-        st.error(f"Failed to refresh access token: {e}")
-        return False
+        st.error(f"Failed to send fax: {e}")
 
-# Main function
-def main():
-    st.title("Dropbox OAuth2 Integration")
+# Streamlit UI
+st.title("Send Fax using Fax.Plus Email")
 
-    if st.session_state.dropbox_access_token is None:
-        # Generate Dropbox authorization URL
-        auth_url = get_authorization_url()
-        st.write(f"Please [authorize the app]({auth_url}) and then paste the authorization code here.")
+uploaded_file = st.file_uploader("Upload Fax Document", type=["pdf", "docx", "png", "jpg"])
+# uploaded_cover_sheet = st.file_uploader("Upload Cover Sheet (Optional)", type=["pdf", "docx", "png", "jpg"])
+receiver_number = st.text_input("Receiver Number")
+fax_message = st.text_area("Fax Message")
+fax_subject = st.text_input("Fax Subject")
+to_name = st.text_input("To Name")
+chaser_name = st.text_input("Chaser Name")
+sender_email = "jimmyross.incall@gmail.com"
+sender_password = "ydta stxc yqkq nbdm"
 
-        # Input for the authorization code
-        auth_code = st.text_input("Authorization Code")
-
-        if auth_code:
-            handle_oauth_code(auth_code)
+if st.button("Send Fax"):
+    if uploaded_file and receiver_number and sender_email and sender_password:
+        handle_faxplus(uploaded_file, receiver_number, fax_message, fax_subject, to_name, chaser_name, sender_email, sender_password)
     else:
-        st.write("You are already authenticated with Dropbox.")
-        st.write("You can now use the Dropbox API.")
-
-        # Add functionality to interact with Dropbox
-        if not is_token_valid():
-            if not refresh_access_token():
-                st.error("Unable to refresh access token.")
-                return
-
-        # Example Dropbox API interaction
-        client = dropbox.Dropbox(st.session_state.dropbox_access_token)
-        try:
-            account_info = client.users_get_current_account()
-            st.write(f"Dropbox Account: {account_info.name.display_name}")
-        except Exception as e:
-            st.error(f"Error interacting with Dropbox: {e}")
-
-if __name__ == "__main__":
-    main()
+        st.error("Please upload a fax document, provide the receiver number, and enter your email credentials.")

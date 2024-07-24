@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 import os
+import tempfile
 import time
 import pandas as pd
 import streamlit as st
@@ -26,6 +27,15 @@ from dropbox.exceptions import AuthError
 from dropbox.files import WriteMode
 from google_auth_oauthlib.flow import InstalledAppFlow
 import google.auth
+from faxplus import ApiClient, OutboxApi, OutboxComment, RetryOptions, OutboxOptions, OutboxCoverPage, PayloadOutbox , FilesApi 
+from faxplus.configuration import Configuration
+from datetime import datetime
+from faxplus.rest import ApiException
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.application import MIMEApplication
+from datetime import datetime
 
 
 # Define the braces and their forms
@@ -216,69 +226,117 @@ def handle_hallofax(combined_pdf, receiver_number, fax_message, fax_subject, to_
     # Return True if successful, False otherwise
     return True
 #TODO -> Try to fix it
-def handle_faxplus(combined_pdf, receiver_number, fax_message, fax_subject, to_name, chaser_name, uploaded_cover_sheet):
-    # Fax.Plus credentials
-    access_token = st.secrets["faxplus_secret_key"]["secret_key"]
-    user_id = st.secrets["faxplus_uid"]["user_id"]
+# Function for handling FaxPlus
+def handle_faxplus(uploaded_file, receiver_number, fax_message, fax_subject, to_name, chaser_name , uploaded_cover_sheet):
+    try:
+        sender_email = st.secrets["gmail_creds"]["address"]
+        email_password = st.secrets["gmail_creds"]["pass"]
+        # Create email
+        msg = MIMEMultipart()
+        msg['From'] = sender_email
+        msg['To'] = f"{receiver_number}@fax.plus"
+        msg['Subject'] = fax_subject
+        
+        # HTML email body
+        html_body = f"""
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Fax Cover Sheet</title>
+            <style>
+                body {{
+                    font-family: Arial, sans-serif;
+                    line-height: 1.6;
+                    margin: 0;
+                    padding: 20px;
+                }}
+                h1 {{
+                    font-size: 24px;
+                    margin-bottom: 20px;
+                }}
+                .section {{
+                    margin-bottom: 15px;
+                }}
+                .label {{
+                    font-weight: bold;
+                }}
+                .checkbox-group {{
+                    margin-top: 15px;
+                }}
+                .checkbox-label {{
+                    margin-right: 20px;
+                }}
+                input[type="checkbox"] {{
+                    margin-right: 5px;
+                }}
+            </style>
+        </head>
+        <body>
+            <h1>FAX</h1>
+            <div class="section">
+                <div class="label">To:</div>
+                Name: {to_name}<br>
+                Fax number: {receiver_number}
+            </div>
+            <div class="section">
+                <div class="label">From:</div>
+                Name: {chaser_name}<br>
+                Fax number: {sender_email}
+            </div>
+            <div class="section">
+                <div class="label">Number of pages:</div>
+                2
+            </div>
+            <div class="section">
+                <div class="label">Subject:</div>
+                {fax_subject}
+            </div>
+            <div class="section">
+                <div class="label">Date:</div>
+                {datetime.now().strftime('%Y-%m-%d')}
+            </div>
+            <div class="checkbox-group">
+                <label class="checkbox-label"><input type="checkbox"> Urgent</label>
+                <label class="checkbox-label"><input type="checkbox"> For Review</label>
+                <label class="checkbox-label"><input type="checkbox"> Please Reply</label>
+                <label class="checkbox-label"><input type="checkbox" checked> Confidential</label>
+            </div>
+            <div class="section">
+                <div class="label">Message:</div>
+                <p>{fax_message}</p>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Add the HTML body as the cover sheet
+        body = MIMEText(html_body, 'html')
+        msg.attach(body)
+        
+        # Attach the cover sheet if provided
+        if uploaded_cover_sheet:
+            cover_sheet = MIMEApplication(uploaded_cover_sheet.getvalue())
+            cover_sheet.add_header('Content-Disposition', 'attachment; filename="cover_sheet.pdf"')
+            msg.attach(cover_sheet)
 
-    # Base URL for the API
-    base_url = 'https://restapi.fax.plus/v3'
-    endpoint = f'/accounts/{user_id}/outbox'
-    url = base_url + endpoint
-
-    # Headers
-    headers = {
-        'Authorization': f'Bearer {access_token}',
-        'Content-Type': 'application/json',
-        'x-fax-clientid': user_id,  # Added client ID to headers
-    }
-
-    # Prepare files
-    files = []
-
-    # Handle combined PDF
-    if isinstance(combined_pdf, io.BytesIO):
-        encoded_combined_pdf = base64.b64encode(combined_pdf.getvalue()).decode()
-        files.append({"name": "combined.pdf", "data": encoded_combined_pdf})
-
-    # Handle cover sheet if uploaded
-    if uploaded_cover_sheet is not None:
-        encoded_cover_sheet = base64.b64encode(uploaded_cover_sheet.read()).decode()
-        files.append({"name": "cover_sheet.pdf", "data": encoded_cover_sheet})
-
-    # Construct the payload
-    payload = {
-        "comment": {
-            "tags": [fax_subject],
-            "text": fax_message
-        },
-        "files": files,
-        "from": "+16023469225",  # Using the caller_id from your original function
-        "options": {
-            "enhancement": True,
-            "retry": {
-                "count": 0,
-                "delay": 0
-            }
-        },
-        "send_time": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),  # Correct ISO 8601 format
-        "to": [receiver_number],
-        "return_ids": True
-    }
-
-    # Make the POST request
-    response = requests.post(url, headers=headers, json=payload)
-
-    # Check if the request was successful
-    if response.status_code == 201:
-        fax_response = response.json()
-        print("Fax sent successfully:", fax_response)
-        return True
-    else:
-        print(f"Error sending fax: {response.status_code}")
-        print(f"Response content: {response.text}")
-        return False
+        # Attach the main document
+        main_document = MIMEApplication(uploaded_file.getvalue())
+        main_document.add_header('Content-Disposition', 'attachment; filename="fax_document.pdf"')
+        msg.attach(main_document)
+        
+        # Send email
+        with smtplib.SMTP('smtp.gmail.com', 587) as server:
+            server.starttls()
+            server.login(sender_email, email_password)
+            server.send_message(msg)
+        
+        st.success(f"Fax sent successfully to {receiver_number}")
     
+    except Exception as e:
+        st.error(f"Failed to send fax: {e}")
+
 def sanitize_filename(filename):
     return re.sub(r'[<>:"/\\|?*\x00-\x1F]', '', filename)
 
@@ -677,6 +735,7 @@ def combine_pdfs(fname):
         merger.close()
         output.seek(0)
         print("PDF combination complete!")
+        
         return output, None
     except Exception as error:
         print(f"An error occurred: {str(error)}")
@@ -849,6 +908,9 @@ def main():
                 mime="application/pdf"
             )
             st.success("Combined PDF is ready for further processing (e.g., sending faxes).")
+            # st.write(type(st.session_state['combined_pdf'].getvalue().get_buffer()))
+
+            # st.success()
 
 
         st.subheader("Select Fax Service")
@@ -865,19 +927,35 @@ def main():
         fax_subject = st.text_input("Fax Subject")
         to_name = st.text_input("To (Recipient Name)")
         chaser_name = st.selectbox("From (Sender Name)", list(chasers_dict.keys()))
+        
+        uploaded_cover_sheet = st.file_uploader("Upload Cover Sheet (Optional)", type="pdf")
+
+        if not uploaded_cover_sheet:
+            # Fields required if no cover sheet is uploaded
+            receiver_number = st.text_input("Receiver Fax Number")
+            fax_message = st.text_area("Fax Message")
+            fax_subject = st.text_input("Fax Subject")
+            to_name = st.text_input("To (Recipient Name)")
+            chaser_name = st.selectbox("From (Sender Name)", list(chasers_dict.keys()))
+
+        else:
+            # If a cover sheet is uploaded, skip additional input fields
+            receiver_number = None
+            fax_message = None
+            fax_subject = None
+            to_name = None
+            chaser_name = None
 
         if st.button("Send Fax"):
-            if not receiver_number:
-                st.error("Please enter a receiver fax number.")
+            if not uploaded_cover_sheet and (not receiver_number or not fax_message or not fax_subject or not to_name or not chaser_name):
+                st.error("Please provide all required fields to generate a cover sheet.")
             elif 'combined_pdf' not in st.session_state:
                 st.error("Please combine PDFs before sending a fax.")
             else:
-                combined_pdf = st.session_state['combined_pdf']
-                result = None
+                combined_pdf = st.session_state.get('combined_pdf')
+                chaser_number = chasers_dict.get(chaser_name, "")
+                fax_message_with_number = f"{fax_message}<br><br><b>From: {chaser_name} {chaser_number}</b>" if fax_message else ""
 
-                # Add the chaser's number to the fax message
-                chaser_number = chasers_dict[chaser_name]
-                fax_message_with_number = f"{fax_message}<br><br><b>From: {chaser_name}  {chaser_number}</b>"
                 if fax_service == "SRFax":
                     result = handle_srfax(combined_pdf, receiver_number, fax_message_with_number, fax_subject, to_name, chaser_name, uploaded_cover_sheet)
                 elif fax_service == "HumbleFax":
@@ -887,7 +965,7 @@ def main():
                 elif fax_service == "FaxPlus":
                     result = handle_faxplus(combined_pdf, receiver_number, fax_message_with_number, fax_subject, to_name, chaser_name, uploaded_cover_sheet)
 
-                if result :
+                if result:
                     st.success(f"Fax sent successfully using {fax_service}.")
                 else:
                     st.error(f"Failed to send fax using {fax_service}. Please check the logs for more information.")
