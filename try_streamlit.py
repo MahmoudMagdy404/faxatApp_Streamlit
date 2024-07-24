@@ -881,7 +881,7 @@ def main():
         st.title("Send Fax")
 
         st.header("Combine PDFs")
-        uploaded_cover_sheet = st.file_uploader("Upload Cover Sheet PDF (Optional)", type="pdf")
+        # uploaded_cover_sheet = st.file_uploader("Upload Cover Sheet PDF (Optional)", type="pdf")
 
         doctor_name = st.text_input("Enter Doctor Name for PDF combination")
         if st.button("Combine PDFs"):
@@ -919,14 +919,14 @@ def main():
             ["SRFax", "HumbleFax", "HalloFax", "FaxPlus"],
             horizontal=True
         )
-        # Receiver number input
-        receiver_number = st.text_input("Receiver Fax Number")
+        # # Receiver number input
+        # receiver_number = st.text_input("Receiver Fax Number")
 
-        # Common fax inputs
-        fax_message = st.text_area("Fax Message")
-        fax_subject = st.text_input("Fax Subject")
-        to_name = st.text_input("To (Recipient Name)")
-        chaser_name = st.selectbox("From (Sender Name)", list(chasers_dict.keys()))
+        # # Common fax inputs
+        # fax_message = st.text_area("Fax Message")
+        # fax_subject = st.text_input("Fax Subject")
+        # to_name = st.text_input("To (Recipient Name)")
+        # chaser_name = st.selectbox("From (Sender Name)", list(chasers_dict.keys()))
         
         uploaded_cover_sheet = st.file_uploader("Upload Cover Sheet (Optional)", type="pdf")
 
