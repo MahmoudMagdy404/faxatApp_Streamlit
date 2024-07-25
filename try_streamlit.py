@@ -36,6 +36,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
 from datetime import datetime
+from googleapiclient.http import MediaIoBaseDownload, MediaFileUpload
 
 
 # Define the braces and their forms
@@ -570,115 +571,136 @@ def on_row_select():
 #         return None, str(error)
 
 
-# Google Drive folder ID where the token is stored
 TOKEN_FOLDER_ID = '1HDwNvgFv_DSEH2WKNfLNheKXxKT_hDM9'
-TOKEN_FILE_NAME = 'token.json'
 CREDENTIALS_FILE_NAME = 'credentials.json'
+TOKEN_FILE_NAME = 'token.json'
 SCOPES = ["https://www.googleapis.com/auth/drive"]
-def get_drive_service():
-    creds = None
+# credentials_json = st.secrets["google_credentials"]["credentials_json"]
 
-    if os.path.exists(TOKEN_FILE_NAME):
-        creds = Credentials.from_authorized_user_file(TOKEN_FILE_NAME, SCOPES)
+# def get_drive_service():
+#     try:
+#         # Use service account credentials to access Google Drive
+#         creds = service_account.Credentials.from_service_account_info(json.loads(credentials_json))
+#     except Exception as e:
+#         print(f"Error loading service account credentials: {e}")
+#         return None
+#     return build('drive', 'v3', credentials=creds)
+
+# def download_file_from_drive(service, file_name, folder_id):
+#     try:
+#         query = f"'{folder_id}' in parents and name='{file_name}'"
+#         results = service.files().list(q=query, spaces='drive', fields="files(id, name)").execute()
+#         items = results.get('files', [])
+
+#         if not items:
+#             print(f'No {file_name} file found in Google Drive folder: {folder_id}')
+#             return None
+
+#         file_id = items[0]['id']
+#         request = service.files().get_media(fileId=file_id)
+#         fh = io.BytesIO()
+#         downloader = MediaIoBaseDownload(fh, request)
+#         done = False
+#         while not done:
+#             status, done = downloader.next_chunk()
+#             print(f"Download {int(status.progress() * 100)}%")
+#         fh.seek(0)
+#         return fh.read()
+
+#     except Exception as e:
+#         print(f'Error downloading {file_name}: {e}')
+#         return None
+
+# def upload_token_to_drive(service, creds):
+#     try:
+#         file_metadata = {
+#             'name': TOKEN_FILE_NAME,
+#             'parents': [TOKEN_FOLDER_ID]
+#         }
+#         media = MediaIoBaseUpload(io.BytesIO(creds.to_json().encode()), mimetype='application/json')
+
+#         query = f"'{TOKEN_FOLDER_ID}' in parents and name='{TOKEN_FILE_NAME}'"
+#         results = service.files().list(q=query, spaces='drive', fields="files(id, name)").execute()
+#         items = results.get('files', [])
+
+#         if items:
+#             file_id = items[0]['id']
+#             service.files().update(fileId=file_id, body=file_metadata, media_body=media).execute()
+#         else:
+#             service.files().create(body=file_metadata, media_body=media).execute()
+
+#         print('Token uploaded to Google Drive successfully!')
+#         return True
+#     except Exception as e:
+#         print(f'Error uploading token: {e}')
+#         return False
+
+# def get_credentials():
+#     creds = None
+#     service = get_drive_service()
+#     if service is None:
+#         return None
     
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(google.auth.transport.requests.Request())
-        else:
-            # Load client secrets
-            with open(CREDENTIALS_FILE_NAME, 'r') as f:
-                credentials_json = json.load(f)
+#     credentials_data = download_file_from_drive(service, CREDENTIALS_FILE_NAME, TOKEN_FOLDER_ID)
+#     if credentials_data:
+#         credentials_json = json.loads(credentials_data)
+#         flow = InstalledAppFlow.from_client_config(credentials_json, SCOPES)
+    
+#         token_data = download_file_from_drive(service, TOKEN_FILE_NAME, TOKEN_FOLDER_ID)
+#         if token_data:
+#             creds = Credentials.from_authorized_user_info(json.loads(token_data), SCOPES)
+    
+#         if not creds or not creds.valid:
+#             if creds and creds.expired and creds.refresh_token:
+#                 creds.refresh(Request())
+#             else:
+#                 creds = flow.run_local_server(port=0)
             
-            flow = InstalledAppFlow.from_client_config(
-                credentials_json, SCOPES
-            )
-            creds = flow.run_local_server(port=0)
-            with open(TOKEN_FILE_NAME, 'w') as token:
-                token.write(creds.to_json())
+#             upload_token_to_drive(service, creds)
+    
+#     return creds
+# Define SCOPES
+# Define SCOPES
+SCOPES = ["https://www.googleapis.com/auth/drive"]
 
+# Load credentials from secrets
+credentials_json = st.secrets["google_credentials"]["credentials_json"]
+
+# Function to update st.secrets
+def update_secrets(key, value):
+    st.secrets[key] = value
+
+def get_drive_service(creds):
     return build('drive', 'v3', credentials=creds)
 
-def download_token_from_drive(service):
+def generate_and_upload_token():
     try:
-        query = f"'{TOKEN_FOLDER_ID}' in parents and name='{TOKEN_FILE_NAME}'"
-        results = service.files().list(q=query, spaces='drive', fields="files(id, name)").execute()
-        items = results.get('files', [])
+        # Generate credentials and token
+        flow = InstalledAppFlow.from_client_config(
+            json.loads(credentials_json), SCOPES
+        )
+        creds = flow.run_local_server(port=0)
         
-        if not items:
-            print(f'No token file found in Google Drive folder: {TOKEN_FOLDER_ID}')
-            return False
+        # Save token to Streamlit secrets
+        token_json = creds.to_json()
+        update_secrets("google_credentials.token_json", token_json)
         
-        file_id = items[0]['id']
-        request = service.files().get_media(fileId=file_id)
-        fh = io.BytesIO()
-        downloader = MediaIoBaseDownload(fh, request)
-        done = False
-        while done is False:
-            status, done = downloader.next_chunk()
-            print(f"Download {int(status.progress() * 100)}%")
-        fh.seek(0)
-        
-        with open(TOKEN_FILE_NAME, 'wb') as f:
-            f.write(fh.read())
-        print('Token downloaded from Google Drive successfully!')
-        return True
+        print('Token generated and saved to Streamlit secrets successfully!')
+        return creds
     except Exception as e:
-        print(f'Error downloading token: {e}')
-        return False
-
-def upload_token_to_drive(service):
-    try:
-        file_metadata = {
-            'name': TOKEN_FILE_NAME,
-            'parents': [TOKEN_FOLDER_ID]
-        }
-        media = MediaIoBaseUpload(io.BytesIO(open(TOKEN_FILE_NAME, 'rb').read()), mimetype='application/json')
-        
-        file_id = None
-        query = f"'{TOKEN_FOLDER_ID}' in parents and name='{TOKEN_FILE_NAME}'"
-        results = service.files().list(q=query, spaces='drive', fields="files(id, name)").execute()
-        items = results.get('files', [])
-        
-        if items:
-            file_id = items[0]['id']
-            service.files().update(fileId=file_id, body=file_metadata, media_body=media).execute()
-        else:
-            service.files().create(body=file_metadata, media_body=media).execute()
-        
-        print('Token uploaded to Google Drive successfully!')
-        return True
-    except Exception as e:
-        print(f'Error uploading token: {e}')
-        return False
+        print(f'Error generating token: {e}')
+        return None
 
 def get_credentials():
-    service = get_drive_service()
-
-    # Download token from Google Drive
-    download_token_from_drive(service)
-
-    creds = None
-    if os.path.exists(TOKEN_FILE_NAME):
-        creds = Credentials.from_authorized_user_file(TOKEN_FILE_NAME, SCOPES)
+    token_data = st.secrets["google_credentials"].get("token_json")
     
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(google.auth.transport.requests.Request())
-        else:
-            # Load client secrets
-            with open(CREDENTIALS_FILE_NAME, 'r') as f:
-                credentials_json = json.load(f)
-            
-            flow = InstalledAppFlow.from_client_config(
-                credentials_json, SCOPES
-            )
-            creds = flow.run_local_server(port=0)
-            with open(TOKEN_FILE_NAME, 'w') as token:
-                token.write(creds.to_json())
-            
-            # Upload the new token to Google Drive
-            upload_token_to_drive(service)
-
+    if token_data:
+        creds = Credentials.from_authorized_user_info(json.loads(token_data), SCOPES)
+    else:
+        creds = generate_and_upload_token()
+        if not creds:
+            return None
+    
     return creds
 
 def combine_pdfs(fname):
@@ -687,37 +709,37 @@ def combine_pdfs(fname):
         return None, "Failed to obtain valid credentials. Please try authenticating again."
 
     try:
-        service = get_drive_service()
+        service = get_drive_service(creds)
         folder_id = "15I95Loh35xI2PcGa36xz7SgMtclo-9DC"
         query = f"'{folder_id}' in parents"
-        
+
         print("Querying Google Drive...")
         results = service.files().list(q=query, pageSize=20, fields="nextPageToken, files(id, name, mimeType)").execute()
         items = results.get("files", [])
-        
+
         if not items:
             return None, "No files found in the specified folder."
-        
+
         fname = fname.strip()
         target_files = [file for file in items if fname in file["name"]]
-        
+
         if not target_files:
             return None, "No matching files found."
-        
+
         print(f"Found {len(target_files)} matching files. Combining PDFs...")
-        
+
         merger = PdfMerger()
         for target_file in target_files:
             mime_type = target_file.get("mimeType")
             file_id = target_file.get("id")
-            
+
             print(f"Processing file: {target_file['name']}")
-            
+
             if mime_type.startswith("application/vnd.google-apps."):
                 request = service.files().export_media(fileId=file_id, mimeType="application/pdf")
             else:
                 request = service.files().get_media(fileId=file_id)
-            
+
             fh = io.BytesIO()
             downloader = MediaIoBaseDownload(fh, request)
             done = False
@@ -725,17 +747,17 @@ def combine_pdfs(fname):
                 status, done = downloader.next_chunk()
                 print(f"Download {int(status.progress() * 100)}%")
             fh.seek(0)
-            
+
             pdf_reader = PdfReader(fh)
             merger.append(pdf_reader)
-        
+
         print("Finalizing PDF...")
         output = io.BytesIO()
         merger.write(output)
         merger.close()
         output.seek(0)
         print("PDF combination complete!")
-        
+
         return output, None
     except Exception as error:
         print(f"An error occurred: {str(error)}")
