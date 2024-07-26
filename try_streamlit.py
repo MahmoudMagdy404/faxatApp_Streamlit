@@ -652,43 +652,18 @@ SCOPES = ["https://www.googleapis.com/auth/drive"]
 
 # Load credentials from secrets
 credentials_json = st.secrets["google_credentials"]["credentials_json"]
-
-# Function to update st.secrets
-def update_secrets(key, value):
-    st.secrets[key] = value
+token_json = st.secrets["google_credentials"]["token_json"]
 
 def get_drive_service(creds):
     return build('drive', 'v3', credentials=creds)
 
-def generate_and_upload_token():
+def get_credentials():
     try:
-        # Generate credentials and token
-        flow = InstalledAppFlow.from_client_config(
-            json.loads(credentials_json), SCOPES
-        )
-        creds = flow.run_console()  # Change from run_local_server to run_console
-        
-        # Save token to Streamlit secrets
-        token_json = creds.to_json()
-        update_secrets("google_credentials.token_json", token_json)
-        
-        print('Token generated and saved to Streamlit secrets successfully!')
+        creds = Credentials.from_authorized_user_info(json.loads(token_json), SCOPES)
         return creds
     except Exception as e:
-        print(f'Error generating token: {e}')
+        print(f"Failed to obtain credentials: {e}")
         return None
-
-def get_credentials():
-    token_data = st.secrets["google_credentials"].get("token_json")
-    
-    if token_data:
-        creds = Credentials.from_authorized_user_info(json.loads(token_data), SCOPES)
-    else:
-        creds = generate_and_upload_token()
-        if not creds:
-            return None
-    
-    return creds
 
 def combine_pdfs(fname):
     creds = get_credentials()
