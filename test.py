@@ -134,46 +134,16 @@ import os
 #     main()
 
 
-from datetime import datetime, timezone
-import os
-import tempfile
-import time
-import pandas as pd
-import streamlit as st
-from urllib.parse import urlencode, quote_plus
-import requests
-from PyPDF2 import PdfMerger, PdfReader
-import re
-from google_auth_oauthlib.flow import Flow
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseDownload
-import base64
-from google.oauth2 import service_account
+import json
+import io
 import streamlit as st
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import Flow
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
-from PyPDF2 import PdfMerger, PdfReader
-import io
-import json
-from google.auth.transport.requests import Request
-import dropbox
-from dropbox.exceptions import AuthError
-from dropbox.files import WriteMode
 from google_auth_oauthlib.flow import InstalledAppFlow
-import google.auth
-from faxplus import ApiClient, OutboxApi, OutboxComment, RetryOptions, OutboxOptions, OutboxCoverPage, PayloadOutbox , FilesApi 
-from faxplus.configuration import Configuration
-from datetime import datetime
-from faxplus.rest import ApiException
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email.mime.application import MIMEApplication
-from datetime import datetime
-from googleapiclient.http import MediaIoBaseDownload, MediaFileUpload
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseDownload
+from PyPDF2 import PdfMerger, PdfReader
 
+# Define SCOPES
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 
 # Load credentials from secrets
@@ -233,8 +203,12 @@ def combine_pdfs(fname):
         if not items:
             return None, "No files found in the specified folder."
 
-        fname = fname.strip()
-        target_files = [file for file in items if fname in file["name"]]
+        fname = fname.strip().lower()
+        target_files = [file for file in items if fname in file["name"].lower()]
+
+        print(f"Searching for files with name containing: {fname}")
+        for file in items:
+            print(f"Found file: {file['name']}")
 
         if not target_files:
             return None, "No matching files found."
@@ -276,5 +250,31 @@ def combine_pdfs(fname):
         print(f"An error occurred: {str(error)}")
         return None, str(error)
 
+# Streamlit UI
+st.header("Combine PDFs")
 
-combine_pdfs("Katrina Glover, MD")
+doctor_name = st.text_input("Enter Doctor Name for PDF combination")
+if st.button("Combine PDFs"):
+    if doctor_name:
+        with st.spinner("Combining PDFs..."):
+            combined_pdf, error = combine_pdfs(doctor_name)
+            if error:
+                st.error(f"Error combining PDFs: {error}")
+            elif combined_pdf:
+                st.success(f"Combined PDF for {doctor_name} created successfully.")
+                st.session_state['combined_pdf'] = combined_pdf
+                st.session_state['doctor_name'] = doctor_name
+                st.experimental_rerun()
+            else:
+                st.error("Failed to create combined PDF. Please try again.")
+    else:
+        st.warning("Please enter a doctor name for PDF combination.")
+
+if 'combined_pdf' in st.session_state:
+    st.download_button(
+        label="Download Combined PDF",
+        data=st.session_state['combined_pdf'].getvalue(),
+        file_name=f"{st.session_state['doctor_name']}_combined.pdf",
+        mime="application/pdf"
+    )
+    st.success("Combined PDF is ready for further processing (e.g., sending faxes).")

@@ -661,6 +661,7 @@ SCOPES = ["https://www.googleapis.com/auth/drive"]
 #     return creds
 # Define SCOPES
 # Define SCOPES
+# Define SCOPES
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 
 # Load credentials from secrets
@@ -720,8 +721,12 @@ def combine_pdfs(fname):
         if not items:
             return None, "No files found in the specified folder."
 
-        fname = fname.strip()
-        target_files = [file for file in items if fname in file["name"]]
+        fname = fname.strip().lower()
+        target_files = [file for file in items if fname in file["name"].lower()]
+
+        print(f"Searching for files with name containing: {fname}")
+        for file in items:
+            print(f"Found file: {file['name']}")
 
         if not target_files:
             return None, "No matching files found."
