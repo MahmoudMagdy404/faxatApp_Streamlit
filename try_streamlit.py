@@ -651,8 +651,12 @@ SCOPES = ["https://www.googleapis.com/auth/drive"]
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 
 # Load credentials from secrets
-credentials_json = st.secrets["google_credentials"]["credentials_json"]
-token_json = st.secrets["google_credentials"]["token_json"]
+try:
+    credentials_json = st.secrets["google_credentials"]["credentials_json"]
+    token_json = st.secrets["google_credentials"]["token_json"]
+except KeyError as e:
+    st.error(f"Missing key in secrets: {e}")
+    st.stop()
 
 def get_drive_service(creds):
     return build('drive', 'v3', credentials=creds)
@@ -662,7 +666,7 @@ def get_credentials():
         creds = Credentials.from_authorized_user_info(json.loads(token_json), SCOPES)
         return creds
     except Exception as e:
-        print(f"Failed to obtain credentials: {e}")
+        st.error(f"Failed to obtain credentials: {e}")
         return None
 
 def combine_pdfs(fname):
@@ -675,7 +679,7 @@ def combine_pdfs(fname):
         folder_id = "15I95Loh35xI2PcGa36xz7SgMtclo-9DC"
         query = f"'{folder_id}' in parents"
 
-        print("Querying Google Drive...")
+        st.info("Querying Google Drive...")
         results = service.files().list(q=query, pageSize=20, fields="nextPageToken, files(id, name, mimeType)").execute()
         items = results.get("files", [])
 
@@ -685,21 +689,21 @@ def combine_pdfs(fname):
         fname = fname.strip().lower()
         target_files = [file for file in items if fname in file["name"].lower()]
 
-        print(f"Searching for files with name containing: {fname}")
+        st.info(f"Searching for files with name containing: {fname}")
         for file in items:
-            print(f"Found file: {file['name']}")
+            st.info(f"Found file: {file['name']}")
 
         if not target_files:
             return None, "No matching files found."
 
-        print(f"Found {len(target_files)} matching files. Combining PDFs...")
+        st.info(f"Found {len(target_files)} matching files. Combining PDFs...")
 
         merger = PdfMerger()
         for target_file in target_files:
             mime_type = target_file.get("mimeType")
             file_id = target_file.get("id")
 
-            print(f"Processing file: {target_file['name']}")
+            st.info(f"Processing file: {target_file['name']}")
 
             if mime_type.startswith("application/vnd.google-apps."):
                 request = service.files().export_media(fileId=file_id, mimeType="application/pdf")
@@ -711,23 +715,24 @@ def combine_pdfs(fname):
             done = False
             while not done:
                 status, done = downloader.next_chunk()
-                print(f"Download {int(status.progress() * 100)}%")
+                st.info(f"Download {int(status.progress() * 100)}%")
             fh.seek(0)
 
             pdf_reader = PdfReader(fh)
             merger.append(pdf_reader)
 
-        print("Finalizing PDF...")
+        st.info("Finalizing PDF...")
         output = io.BytesIO()
         merger.write(output)
         merger.close()
         output.seek(0)
-        print("PDF combination complete!")
+        st.info("PDF combination complete!")
 
         return output, None
     except Exception as error:
-        print(f"An error occurred: {str(error)}")
+        st.error(f"An error occurred: {str(error)}")
         return None, str(error)
+
     
 def main():
     # Sidebar navigation
