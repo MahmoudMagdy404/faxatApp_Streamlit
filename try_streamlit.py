@@ -3,39 +3,27 @@ import os
 import tempfile
 import time
 import pandas as pd
-import streamlit as st
 from urllib.parse import urlencode, quote_plus
 import requests
 from PyPDF2 import PdfMerger, PdfReader
 import re
-from google_auth_oauthlib.flow import Flow
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseDownload
 import base64
 from google.oauth2 import service_account
 import streamlit as st
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
-from PyPDF2 import PdfMerger, PdfReader
 import io
 import json
-from google.auth.transport.requests import Request
-import dropbox
-from dropbox.exceptions import AuthError
-from dropbox.files import WriteMode
 from google_auth_oauthlib.flow import InstalledAppFlow
 import google.auth
 from faxplus import ApiClient, OutboxApi, OutboxComment, RetryOptions, OutboxOptions, OutboxCoverPage, PayloadOutbox , FilesApi 
 from faxplus.configuration import Configuration
-from datetime import datetime
 from faxplus.rest import ApiException
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
-from datetime import datetime
 from googleapiclient.http import MediaIoBaseDownload, MediaFileUpload
 
 
@@ -660,8 +648,6 @@ SCOPES = ["https://www.googleapis.com/auth/drive"]
     
 #     return creds
 # Define SCOPES
-# Define SCOPES
-# Define SCOPES
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 
 # Load credentials from secrets
@@ -680,7 +666,7 @@ def generate_and_upload_token():
         flow = InstalledAppFlow.from_client_config(
             json.loads(credentials_json), SCOPES
         )
-        creds = flow.run_local_server(port=0)
+        creds = flow.run_console()  # Change from run_local_server to run_console
         
         # Save token to Streamlit secrets
         token_json = creds.to_json()
@@ -767,7 +753,7 @@ def combine_pdfs(fname):
     except Exception as error:
         print(f"An error occurred: {str(error)}")
         return None, str(error)
-
+    
 def main():
     # Sidebar navigation
     st.sidebar.title("Navigation")
@@ -935,9 +921,6 @@ def main():
                 mime="application/pdf"
             )
             st.success("Combined PDF is ready for further processing (e.g., sending faxes).")
-            # st.write(type(st.session_state['combined_pdf'].getvalue().get_buffer()))
-
-            # st.success()
 
 
         st.subheader("Select Fax Service")
