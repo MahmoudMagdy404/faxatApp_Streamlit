@@ -653,7 +653,7 @@ SCOPES = ["https://www.googleapis.com/auth/drive"]
 # Load credentials from secrets
 try:
     credentials_json = st.secrets["google_credentials"]["credentials_json"]
-    token_json = st.secrets["google_credentials"]["token_json"]
+    token_json = st.secrets["google_credentials"].get("token_json")
 except KeyError as e:
     st.error(f"Missing key in secrets: {e}")
     st.stop()
