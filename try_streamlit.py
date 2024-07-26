@@ -349,7 +349,6 @@ def get_srfax_outbox():
     else:
         return None
 #TODO
-def get_humble_outbox():
     return
 def get_hallo_outbox():
     return
@@ -382,18 +381,25 @@ def get_faxplus_outbox():
         print("Outbox faxes:", outbox_faxes)
     else:
         print(f"Error: {response.status_code}, {response.text}")
+import logging
 
-    
-def resend_srfax(fax_id):
+# Set up logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
+def retrieve_srfax(fax_file_name, direction):
     access_id = st.secrets["sr_access_id"]["access_id"]
     access_pwd = st.secrets["sr_access_pwd"]["access_pwd"]
     
     url = "https://www.srfax.com/SRF_SecWebSvc.php"
     payload = {
-        "action": "Resend_Fax",
+        "action": "Retrieve_Fax",
         "access_id": access_id,
         "access_pwd": access_pwd,
-        "sFaxDetailsID": fax_id
+        "sFaxFileName": fax_file_name,
+        "sDirection": direction,
+        "sResponseFormat": "JSON",
+        "sFaxFormat": "PDF"
     }
     
     response = requests.post(url, data=payload)
@@ -401,14 +407,233 @@ def resend_srfax(fax_id):
         return response.json()
     else:
         return None
+
+def send_srfax(to_fax_number, file_content, sender_email, caller_id):
+    access_id = st.secrets["sr_access_id"]["access_id"]
+    access_pwd = st.secrets["sr_access_pwd"]["access_pwd"]
+    
+    url = "https://www.srfax.com/SRF_SecWebSvc.php"
+    
+    # The file_content is already base64 encoded, so we don't need to encode it again
+    payload = {
+        "action": "Queue_Fax",
+        "access_id": access_id,
+        "access_pwd": access_pwd,
+        "sToFaxNumber": to_fax_number,
+        "sResponseFormat": "JSON",
+        "sFaxType": "SINGLE",
+        "sFileName_1": "combined.pdf",
+        "sFileContent_1": file_content,  # Already base64 encoded
+        "sSenderEmail": sender_email,
+        "sCallerID": caller_id
+    }
+    
+    logger.debug(f"Attempting to send fax with type: SINGLE")
+    logger.debug(f"Sending fax to: {to_fax_number}")
+    logger.debug(f"Sender email: {sender_email}")
+    logger.debug(f"Caller ID: {caller_id}")
+    logger.debug(f"Fax content type: {type(file_content)}")
+    logger.debug(f"Fax content preview: {file_content[:100]}")
+    
+    response = requests.post(url, data=payload)
+    logger.debug(f"SRFax API response status code: {response.status_code}")
+    logger.debug(f"SRFax API response content: {response.text}")
+    
+    if response.status_code == 200:
+        result = response.json()
+        if result['Status'] == 'Success':
+            return result
+        else:
+            logger.error(f"Failed to send fax. Error: {result['Result']}")
+    else:
+        logger.error(f"HTTP error when sending fax. Status code: {response.status_code}")
+    
+    return {"Status": "Failed", "Result": "Failed to send fax"}
+def resend_srfax(fax_id):
+    logger.debug(f"Attempting to resend fax with ID: {fax_id}")
+    
+    outbox = get_srfax_outbox()
+    if not outbox or outbox['Status'] != 'Success':
+        logger.error("Failed to get outbox")
+        return {"Status": "Failed", "Result": "Failed to get outbox"}
+    
+    fax_to_resend = next((fax for fax in outbox['Result'] if fax['FileName'] == fax_id), None)
+    
+    if not fax_to_resend:
+        logger.error(f"Fax with ID {fax_id} not found in outbox")
+        return {"Status": "Failed", "Result": "Fax not found in outbox"}
+    
+    logger.debug(f"Fax to resend details: {fax_to_resend}")
+    
+    retrieved_fax = retrieve_srfax(fax_to_resend['FileName'], "OUT")
+    if not retrieved_fax or retrieved_fax['Status'] != 'Success':
+        logger.error("Failed to retrieve fax content")
+        return {"Status": "Failed", "Result": "Failed to retrieve fax content"}
+    
+    fax_content = retrieved_fax['Result']
+    logger.debug(f"Retrieved fax content type: {type(fax_content)}")
+    logger.debug(f"Retrieved fax content preview: {fax_content[:100]}")
+    
+    # Check if the content is valid base64
+    try:
+        base64.b64decode(fax_content)
+    except:
+        logger.error("Retrieved fax content is not valid base64")
+        return {"Status": "Failed", "Result": "Invalid fax content"}
+    
+    sender_email = "Alvin.freeman.italk@gmail.com"
+    caller_id = "8888516047"
+    
+    result = send_srfax(fax_to_resend['ToFaxNumber'], fax_content, sender_email, caller_id)
+    
+    logger.debug(f"Resend result: {result}")
+    return result
+
+
+
 #TODO
-def resend_humble(fax_id):
     return
 def resend_hallo(fax_id):
     return
 def resend_faxplus(fax_id):
     return
 
+
+# Streamlit secrets
+access_key = st.secrets["humble_access_key"]["access_key"]
+secret_key = st.secrets["humble_secret_key"]["secret_key"]
+
+def get_humble_outbox():
+    url = "https://api.humblefax.com/sentFaxes"
+    headers = {
+        "Authorization": f"Basic {base64.b64encode(f'{access_key}:{secret_key}'.encode()).decode()}"
+    }
+    
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        logger.error(f"Failed to get HumbleFax outbox: {response.text}")
+        return None
+
+def retrieve_humble_fax(fax_id):
+    url = f"https://api.humblefax.com/fax/{fax_id}"
+    headers = {
+        "Authorization": f"Basic {base64.b64encode(f'{access_key}:{secret_key}'.encode()).decode()}"
+    }
+    
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        logger.error(f"Failed to retrieve HumbleFax: {response.text}")
+        return None
+
+def create_humble_tmp_fax(payload):
+    url = "https://api.humblefax.com/tmpFax"
+    headers = {
+        "Authorization": f"Basic {base64.b64encode(f'{access_key}:{secret_key}'.encode()).decode()}"
+    }
+    
+    response = requests.post(url, headers=headers, json=payload)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        logger.error(f"Failed to create temporary fax: {response.text}")
+        return None
+
+def get_humble_attachment(fax_id, attachment_id):
+    url = f"https://api.humblefax.com/fax/{fax_id}/attachment/{attachment_id}"
+    headers = {
+        "Authorization": f"Basic {base64.b64encode(f'{access_key}:{secret_key}'.encode()).decode()}"
+    }
+    
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        return response.content
+    else:
+        logger.error(f"Failed to get attachment: {response.text}")
+        return None
+
+def upload_humble_attachment(tmp_fax_id, file_content, file_name):
+    url = f"https://api.humblefax.com/attachment/{tmp_fax_id}"
+    headers = {
+        "Authorization": f"Basic {base64.b64encode(f'{access_key}:{secret_key}'.encode()).decode()}"
+    }
+    
+    files = {'file': (file_name, file_content, 'application/pdf')}
+    response = requests.post(url, headers=headers, files=files)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        logger.error(f"Failed to upload attachment: {response.text}")
+        return None
+
+def send_humble_tmp_fax(tmp_fax_id):
+    url = f"https://api.humblefax.com/tmpFax/{tmp_fax_id}/send"
+    headers = {
+        "Authorization": f"Basic {base64.b64encode(f'{access_key}:{secret_key}'.encode()).decode()}"
+    }
+    
+    response = requests.post(url, headers=headers)
+    if response.status_code == 200:
+        result = response.json()
+        if result.get("result") == "success":
+            return result.get("data", {}).get("id")
+    logger.error(f"Failed to send temporary fax: {response.text}")
+    return None
+
+def resend_humble(fax_id):
+    logger.debug(f"Attempting to resend HumbleFax with ID: {fax_id}")
+    
+    # Retrieve the original fax details
+    fax_details = retrieve_humble_fax(fax_id)
+    if not fax_details or fax_details.get("result") != "success":
+        logger.error(f"Failed to retrieve fax details for ID: {fax_id}")
+        return {"Status": "Failed", "Result": "Failed to retrieve fax details"}
+    
+    fax_data = fax_details.get("data", {})
+    
+    # Prepare the payload for creating a new temporary fax
+    create_tmp_fax_payload = {
+        "toName": fax_data.get("toName"),
+        "recipients": fax_data.get("recipients"),
+        "fromName": fax_data.get("fromName"),
+        "subject": fax_data.get("subject"),
+        "message": fax_data.get("message"),
+        "includeCoversheet": fax_data.get("includeCoversheet", True),
+        "companyInfo": fax_data.get("companyInfo"),
+        "pageSize": fax_data.get("pageSize", "A4"),
+        "resolution": fax_data.get("resolution", "Fine"),
+        "fromNumber": fax_data.get("fromNumber")
+    }
+    
+    # Create a new temporary fax
+    tmp_fax = create_humble_tmp_fax(create_tmp_fax_payload)
+    if not tmp_fax or tmp_fax.get("result") != "success":
+        logger.error("Failed to create temporary fax")
+        return {"Status": "Failed", "Result": "Failed to create temporary fax"}
+    
+    tmp_fax_id = tmp_fax.get("data", {}).get("tmpFax", {}).get("id")
+    
+    # Upload the original attachments to the new temporary fax
+    for attachment in fax_data.get("attachments", []):
+        attachment_id = attachment.get("id")
+        attachment_content = get_humble_attachment(fax_id, attachment_id)
+        if attachment_content:
+            upload_result = upload_humble_attachment(tmp_fax_id, attachment_content, attachment.get("name"))
+            if not upload_result:
+                logger.error(f"Failed to upload attachment: {attachment.get('name')}")
+                return {"Status": "Failed", "Result": "Failed to upload attachment"}
+    
+    # Send the new fax
+    send_result = send_humble_tmp_fax(tmp_fax_id)
+    if send_result:
+        logger.debug(f"HumbleFax resent successfully. New Fax ID: {send_result}")
+        return {"Status": "Success", "Result": send_result}
+    else:
+        logger.error("Failed to send HumbleFax")
+        return {"Status": "Failed", "Result": "Failed to send fax"}
 def on_row_select():
     if 'selected_fax_index' in st.session_state and st.session_state['selected_fax_index'] is not None:
         selected_fax = st.session_state['faxes_df'].iloc[st.session_state['selected_fax_index']]
@@ -985,10 +1210,10 @@ def main():
 
             elif fax_service == 'HumbleFax':
                 outbox = get_humble_outbox()
-                if outbox and outbox['Status'] == 'Success':
-                    faxes = outbox['Result']
-                    for fax in faxes:
-                        fax['Service'] = 'HumbleFax'
+                if outbox :
+                    faxes = outbox.get("sentFaxIds", [])
+                    # for fax in faxes:
+                    #     fax['Service'] = 'HumbleFax'
                     all_faxes.extend(faxes)
 
             elif fax_service == 'HalloFax':
@@ -1054,7 +1279,7 @@ def main():
                     if result and result['Status'] == 'Success':
                         st.success("Fax resent successfully!")
                     else:
-                        st.error("Failed to resend fax. Please try again.")
+                        st.error(f"Failed to resend fax. Reason: {result.get('Result', 'Unknown error')}")
 
 if __name__ == "__main__":
     main()
