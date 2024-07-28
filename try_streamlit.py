@@ -944,12 +944,30 @@ SCOPES = ["https://www.googleapis.com/auth/drive"]
     
 #     return creds
 # Define SCOPES
-
 SCOPES = ["https://www.googleapis.com/auth/drive"]
-TOKEN_FILE = 'temp.txt'
+TOKEN_URL = 'https://raw.githubusercontent.com/MahmoudMagdy404/faxatApp_Streamlit/main/temp.txt'
 
 def get_drive_service(creds):
     return build('drive', 'v3', credentials=creds)
+
+def fetch_token():
+    try:
+        response = requests.get(TOKEN_URL)
+        response.raise_for_status()  # Check for HTTP errors
+        token_json = response.text.strip()
+        if not token_json:
+            st.info("Token file is empty. Starting authentication...")
+            authenticate_and_save_credentials()
+            return get_credentials()  # Retry to get credentials after authentication
+        return json.loads(token_json)
+    except requests.RequestException as e:
+        st.error(f"Failed to fetch token from GitHub: {e}")
+        authenticate_and_save_credentials()
+        return get_credentials()  # Retry to get credentials after re-authentication
+    except json.JSONDecodeError as e:
+        st.error(f"Invalid JSON in token file: {e}")
+        authenticate_and_save_credentials()
+        return get_credentials()  # Retry to get credentials after re-authentication
 
 def authenticate_and_save_credentials():
     # Load client secrets from Streamlit secrets
@@ -962,46 +980,26 @@ def authenticate_and_save_credentials():
     )
     creds = flow.run_local_server(port=0)
     
-    # Save the token to `temp.txt`
-    with open(TOKEN_FILE, "w") as token_file:
-        token_file.write(creds.to_json())
+    # Save the token to GitHub repository (requires API access or other method)
+    st.info("Token saved. Please ensure it's updated in your GitHub repository.")
 
 def get_credentials():
-        try:
-            with open(TOKEN_FILE, 'r') as token_file:
-                token_json = token_file.read().strip()
-                if not token_json:
-                    st.info("Token file is empty. Starting authentication...")
-                    authenticate_and_save_credentials()
-                    return get_credentials()  # Retry to get credentials after authentication
+    token_data = fetch_token()
+    if token_data:
+        creds = Credentials.from_authorized_user_info(token_data, SCOPES)
 
-                creds = Credentials.from_authorized_user_info(json.loads(token_json), SCOPES)
-
-                # Refresh the token if it's expired
-                if creds and creds.expired and creds.refresh_token:
-                    try:
-                        creds.refresh(requests.Request())
-                        with open(TOKEN_FILE, 'w') as token_file:
-                            token_file.write(creds.to_json())
-                    except Exception as e:
-                        st.error(f"Error refreshing token: {e}")
-                        authenticate_and_save_credentials()  # Re-authenticate if refreshing fails
-                        return get_credentials()  # Retry to get credentials after re-authentication
-                return creds
-
-        except json.JSONDecodeError as e:
-            st.error(f"Invalid JSON in token file: {e}")
-            authenticate_and_save_credentials()  # Re-authenticate if JSON is invalid
-            return get_credentials()  # Retry to get credentials after re-authentication
-        except Exception as e:
-            st.error(f"Failed to obtain credentials from file: {e}")
-            authenticate_and_save_credentials()  # Re-authenticate if other errors occur
-            return get_credentials()  # Retry to get credentials after re-authentication
-    # else:
-    #     st.info("Token file not found. Starting authentication...")
-    #     authenticate_and_save_credentials()  # Start authentication if file is not found
-    #     return get_credentials()  # Retry to get credentials after authentication
-
+        # Refresh the token if it's expired
+        if creds and creds.expired and creds.refresh_token:
+            try:
+                creds.refresh(requests.Request())
+                # Update token on GitHub
+                st.info("Token refreshed. Please ensure it's updated in your GitHub repository.")
+            except Exception as e:
+                st.error(f"Error refreshing token: {e}")
+                authenticate_and_save_credentials()  # Re-authenticate if refreshing fails
+                return get_credentials()  # Retry to get credentials after re-authentication
+        return creds
+    return None
 
 def combine_pdfs(fname):
     creds = get_credentials()
