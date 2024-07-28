@@ -25,6 +25,119 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
 from googleapiclient.http import MediaIoBaseDownload, MediaFileUpload
+import logging
+import html
+style = """
+<style>
+            body {
+                font-family: Arial, sans-serif;
+                line-height: 1.6;
+                margin: 0;
+                padding: 30px;
+                font-size: 16px;
+                max-width: 210mm; /* A4 width */
+                min-height: 297mm; /* A4 height */
+            }
+            h1 {
+                font-size: 48px;
+                font-weight: bold;
+                margin-bottom: 30px;
+            }
+            .grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 20px;
+                margin-bottom: 30px;
+            }
+            .full-width {
+                grid-column: 1 / -1;
+            }
+            .section {
+                margin-bottom: 20px;
+            }
+            .label {
+                font-weight: bold;
+                font-size: 18px;
+                margin-bottom: 5px;
+            }
+            .content {
+                font-size: 16px;
+            }
+            .checkbox-group {
+                margin: 30px 0;
+                border-top: 2px solid #000;
+                border-bottom: 2px solid #000;
+                padding: 15px 0;
+                font-size: 18px;
+            }
+            .checkbox-label {
+                margin-right: 30px;
+            }
+            .message-label {
+                font-weight: bold;
+                font-size: 20px;
+                margin-bottom: 10px;
+            }
+            .message-content {
+                font-size: 16px;
+            }
+        </style>
+"""
+
+
+def generate_cover_page_html(chaser_name, to_name, fax_subject, fax_message, date, sender_email, receiver_number):
+    html_body = f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Fax Cover Sheet</title>
+    </head>
+    <body style="font-family: Arial, sans-serif; line-height: 1.8; margin: 0; padding: 40px; font-size: 18px; max-width: 210mm; min-height: 297mm;">
+        <h1 style="font-size: 60px; font-weight: bold; margin-bottom: 40px;">FAX</h1>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 40px;">
+            <div style="margin-bottom: 30px;">
+                <div style="font-weight: bold; font-size: 22px; margin-bottom: 10px;">To</div>
+                <div style="font-size: 18px;">
+                    Name: {to_name}<br>
+                    Fax number: {receiver_number}
+                </div>
+            </div>
+            <div style="margin-bottom: 30px;">
+                <div style="font-weight: bold; font-size: 22px; margin-bottom: 10px;">From</div>
+                <div style="font-size: 18px;">
+                    Name: {chaser_name}<br>
+                    Fax number: {sender_email}
+                </div>
+            </div>
+        </div>
+        <div style="margin-bottom: 30px;">
+            <div style="font-weight: bold; font-size: 22px; margin-bottom: 10px;">Number of pages: 2</div>
+            <div style="font-size: 18px;"></div>
+        </div>
+        <div style="margin-bottom: 30px;">
+            <div style="font-weight: bold; font-size: 22px; margin-bottom: 10px;">Subject: </div>
+            <div style="font-size: 18px;">{fax_subject}</div>
+        </div>
+        <div style="margin-bottom: 30px;">
+            <div style="font-weight: bold; font-size: 22px; margin-bottom: 10px;">Date:</div>
+            <div style="font-size: 18px;">{date}</div>
+        </div>
+        <div style="margin: 40px 0; border-top: 2px solid #000; border-bottom: 2px solid #000; padding: 20px 0; font-size: 22px;">
+            <span style="margin-right: 40px;">☐ Urgent</span>
+            <span style="margin-right: 40px;">☐ For Review</span>
+            <span style="margin-right: 40px;">☐ Please Reply</span>
+            <span>☑ Confidential</span>
+        </div>
+        <div style="margin-bottom: 30px;">
+            <div style="font-weight: bold; font-size: 24px; margin-bottom: 15px;">Message:</div>
+            <div style="font-size: 18px;">{fax_message}</div>
+        </div>
+    </body>
+    </html>
+    """
+    return html_body
 
 
 # Define the braces and their forms
@@ -215,93 +328,25 @@ def handle_hallofax(combined_pdf, receiver_number, fax_message, fax_subject, to_
     # Return True if successful, False otherwise
     return True
 #TODO -> Try to fix it
-# Function for handling FaxPlus
-def handle_faxplus(uploaded_file, receiver_number, fax_message, fax_subject, to_name, chaser_name , uploaded_cover_sheet):
+
+
+
+def handle_faxplus(uploaded_file, receiver_number, fax_message, fax_subject, to_name, chaser_name, uploaded_cover_sheet):
     try:
         sender_email = st.secrets["gmail_creds"]["address"]
         email_password = st.secrets["gmail_creds"]["pass"]
+        
         # Create email
         msg = MIMEMultipart()
         msg['From'] = sender_email
         msg['To'] = f"{receiver_number}@fax.plus"
         msg['Subject'] = fax_subject
         
-        # HTML email body
-        html_body = f"""
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Fax Cover Sheet</title>
-            <style>
-                body {{
-                    font-family: Arial, sans-serif;
-                    line-height: 1.6;
-                    margin: 0;
-                    padding: 20px;
-                }}
-                h1 {{
-                    font-size: 24px;
-                    margin-bottom: 20px;
-                }}
-                .section {{
-                    margin-bottom: 15px;
-                }}
-                .label {{
-                    font-weight: bold;
-                }}
-                .checkbox-group {{
-                    margin-top: 15px;
-                }}
-                .checkbox-label {{
-                    margin-right: 20px;
-                }}
-                input[type="checkbox"] {{
-                    margin-right: 5px;
-                }}
-            </style>
-        </head>
-        <body>
-            <h1>FAX</h1>
-            <div class="section">
-                <div class="label">To:</div>
-                Name: {to_name}<br>
-                Fax number: {receiver_number}
-            </div>
-            <div class="section">
-                <div class="label">From:</div>
-                Name: {chaser_name}<br>
-                Fax number: {sender_email}
-            </div>
-            <div class="section">
-                <div class="label">Number of pages:</div>
-                2
-            </div>
-            <div class="section">
-                <div class="label">Subject:</div>
-                {fax_subject}
-            </div>
-            <div class="section">
-                <div class="label">Date:</div>
-                {datetime.now().strftime('%Y-%m-%d')}
-            </div>
-            <div class="checkbox-group">
-                <label class="checkbox-label"><input type="checkbox"> Urgent</label>
-                <label class="checkbox-label"><input type="checkbox"> For Review</label>
-                <label class="checkbox-label"><input type="checkbox"> Please Reply</label>
-                <label class="checkbox-label"><input type="checkbox" checked> Confidential</label>
-            </div>
-            <div class="section">
-                <div class="label">Message:</div>
-                <p>{fax_message}</p>
-            </div>
-        </body>
-        </html>
-        """
+        # Generate cover page HTML
+        cover_page_html = generate_cover_page_html(chaser_name, to_name, fax_subject, fax_message, datetime.now().strftime('%b %d, %Y'), sender_email , receiver_number)
         
         # Add the HTML body as the cover sheet
-        body = MIMEText(html_body, 'html')
+        body = MIMEText(cover_page_html, 'html')
         msg.attach(body)
         
         # Attach the cover sheet if provided
@@ -309,20 +354,21 @@ def handle_faxplus(uploaded_file, receiver_number, fax_message, fax_subject, to_
             cover_sheet = MIMEApplication(uploaded_cover_sheet.getvalue())
             cover_sheet.add_header('Content-Disposition', 'attachment; filename="cover_sheet.pdf"')
             msg.attach(cover_sheet)
-
-        # Attach the main document
-        main_document = MIMEApplication(uploaded_file.getvalue())
-        main_document.add_header('Content-Disposition', 'attachment; filename="fax_document.pdf"')
-        msg.attach(main_document)
         
-        # Send email
-        with smtplib.SMTP('smtp.gmail.com', 587) as server:
-            server.starttls()
-            server.login(sender_email, email_password)
-            server.send_message(msg)
+        # Attach the main file
+        if uploaded_file:
+            main_attachment = MIMEApplication(uploaded_file.getvalue())
+            main_attachment.add_header('Content-Disposition', f'attachment; filename="Main File"')
+            msg.attach(main_attachment)
         
-        st.success(f"Fax sent successfully to {receiver_number}")
-    
+        # Send the email (SMTP configuration required)
+        import smtplib
+        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
+        server.login(sender_email, email_password)
+        server.sendmail(sender_email, f"{receiver_number}@fax.plus", msg.as_string())
+        server.quit()
+        
+        st.success("Fax sent successfully")
     except Exception as e:
         st.error(f"Failed to send fax: {e}")
 
@@ -381,7 +427,6 @@ def get_faxplus_outbox():
         print("Outbox faxes:", outbox_faxes)
     else:
         print(f"Error: {response.status_code}, {response.text}")
-import logging
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -493,6 +538,7 @@ def resend_srfax(fax_id):
 
 #TODO
     return
+
 def resend_hallo(fax_id):
     return
 def resend_faxplus(fax_id):
@@ -500,9 +546,34 @@ def resend_faxplus(fax_id):
 
 
 # Streamlit secrets
+HUMBLEFAX_API_BASE_URL = "https://api.humblefax.com"
 access_key = st.secrets["humble_access_key"]["access_key"]
 secret_key = st.secrets["humble_secret_key"]["secret_key"]
+def get_humblefax_details(fax_id):
+    url = f"{HUMBLEFAX_API_BASE_URL}/sentFax/{fax_id}"
+    auth = (access_key, secret_key)
+    try:
+        response = requests.get(url, auth=auth)
+        response.raise_for_status()
+        
+        fax_data = response.json().get("data", {}).get("sentFax", {})
+        
+        # Extract relevant details and return them in a structured format
+        recipient = fax_data.get("recipients", [{}])[0]  # Get the first recipient's details
+        
+        fax_details = {
+            'ToFaxNumber': recipient.get('toNumber', ''),
+            'DateSent': datetime.utcfromtimestamp(int(fax_data.get('timestamp', 0))).strftime('%Y-%m-%d %H:%M:%S'),
+            'SentStatus': fax_data.get('status', ''),
+            'FileName': fax_data.get('subject', ''),  # Assuming subject as file name as there's no file name in response
+            'Service': 'HumbleFax'
+        }
+        
+        return fax_details
 
+    except requests.exceptions.RequestException as e:
+        print(f"Failed to retrieve fax details for fax_id {fax_id}: {e}")
+        return None
 def get_humble_outbox():
     url = "https://api.humblefax.com/sentFaxes"
     headers = {
@@ -883,10 +954,12 @@ def get_drive_service(creds):
 def authenticate_and_save_credentials():
     # Load client secrets from Streamlit secrets
     client_secrets = st.secrets["google_credentials"]["credentials_json"]
-    with open("client_secret.json", "w") as f:
-        f.write(client_secrets)
-
-    flow = InstalledAppFlow.from_client_secrets_file("client_secret.json", SCOPES)
+    
+    # Create the flow using the client secrets directly
+    flow = InstalledAppFlow.from_client_config(
+        json.loads(client_secrets),
+        SCOPES
+    )
     creds = flow.run_local_server(port=0)
     
     # Save the token to `temp.txt`
@@ -1238,6 +1311,7 @@ def main():
             all_faxes = []
 
             if fax_service == 'SRFax':
+                all_faxes = []
                 outbox = get_srfax_outbox()
                 if outbox and outbox['Status'] == 'Success':
                     faxes = outbox['Result']
@@ -1246,14 +1320,22 @@ def main():
                     all_faxes.extend(faxes)
 
             elif fax_service == 'HumbleFax':
+                all_faxes = []
                 outbox = get_humble_outbox()
-                if outbox :
-                    faxes = outbox.get("sentFaxIds", [])
-                    # for fax in faxes:
-                    #     fax['Service'] = 'HumbleFax'
-                    all_faxes.extend(faxes)
+                if outbox:
+                    faxes = outbox["data"].get("sentFaxIds", [])
+                    print(faxes)
+                    for fax_id in faxes[:10]:
+                        # Assuming you have a way to get details for each fax_id
+                        print(fax_id)
+                        fax_details = get_humblefax_details(fax_id)  # You need to implement this function
+                        print(fax_details)
+                        if fax_details:
+                            fax_details['Service'] = 'HumbleFax'
+                            all_faxes.append(fax_details)
 
             elif fax_service == 'HalloFax':
+                all_faxes = []
                 outbox = get_hallo_outbox()
                 if outbox and outbox['Status'] == 'Success':
                     faxes = outbox['Result']
@@ -1262,6 +1344,7 @@ def main():
                     all_faxes.extend(faxes)
 
             elif fax_service == 'FaxPlus':
+                all_faxes = []
                 outbox = get_faxplus_outbox()
                 if outbox:
                     for fax in outbox:
@@ -1273,7 +1356,7 @@ def main():
                 df = pd.DataFrame(all_faxes)
                 df = df[['ToFaxNumber', 'DateSent', 'SentStatus', 'FileName', 'Service']]  # Include FileName for resending
                 df.columns = ['To', 'Date', 'Status', 'FileName', 'Service']  # Rename columns for display
-                
+
                 # Store the DataFrame in session state for later use
                 st.session_state['faxes_df'] = df
                 st.session_state['selected_fax_index'] = None
@@ -1285,14 +1368,14 @@ def main():
                 st.session_state['faxes_df'].drop(columns=['FileName']),
                 height=300
             )
-            
+
             # Add a number input for row selection
             selected_index = st.number_input("Select a row number", min_value=1, max_value=len(st.session_state['faxes_df']), value=1, step=1) - 1
-            
+
             if st.button("Confirm Selection"):
                 st.session_state['selected_fax_index'] = selected_index
                 on_row_select()
-            
+
             # Display the selected fax information
             st.write(st.session_state.get('selected_fax_info', "No fax selected"))
             
