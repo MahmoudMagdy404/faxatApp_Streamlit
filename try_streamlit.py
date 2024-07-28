@@ -946,79 +946,25 @@ SCOPES = ["https://www.googleapis.com/auth/drive"]
 # Define SCOPES
 
 SCOPES = ["https://www.googleapis.com/auth/drive"]
-TOKEN_URL = 'https://raw.githubusercontent.com/MahmoudMagdy404/faxatApp_Streamlit/main/temp.txt'
+
+# Load credentials from secrets
+try:
+    credentials_json = st.secrets["google_credentials"]["credentials_json"]
+    token_json = st.secrets["google_credentials"]["token_json"]
+except KeyError as e:
+    st.error(f"Missing key in secrets: {e}")
+    st.stop()
 
 def get_drive_service(creds):
     return build('drive', 'v3', credentials=creds)
 
-def fetch_token():
-    try:
-        response = requests.get(TOKEN_URL)
-        response.raise_for_status()
-        token_json = response.text.strip()
-        if not token_json:
-            st.info("Token file is empty. Starting authentication...")
-            authenticate_and_save_credentials()
-            return get_credentials()
-        return json.loads(token_json)
-    except requests.RequestException as e:
-        st.error(f"Failed to fetch token from GitHub: {e}")
-        authenticate_and_save_credentials()
-        return get_credentials()
-    except json.JSONDecodeError as e:
-        st.error(f"Invalid JSON in token file: {e}")
-        authenticate_and_save_credentials()
-        return get_credentials()
-
-def authenticate_and_save_credentials():
-    client_secrets = st.secrets["google_credentials"]["credentials_json"]
-    flow = InstalledAppFlow.from_client_config(json.loads(client_secrets), SCOPES)
-    
-    auth_url, _ = flow.authorization_url(
-        access_type='offline',
-        include_granted_scopes='true',
-        prompt='consent'
-    )
-    
-    st.write("Please authenticate by visiting the following URL:")
-    st.write(auth_url)
-    
-    # Store the authorization code from user input
-    auth_code = st.text_input("Paste the authorization code here:")
-
-    if auth_code:
-        try:
-            flow.fetch_token(code=auth_code)
-            creds = flow.credentials
-            
-            # Save token to a cloud storage solution or database
-            # Example with a placeholder function
-            save_token_to_cloud(creds.to_json())
-            
-            st.success("Authentication successful! Token has been saved.")
-        except Exception as e:
-            st.error(f"Failed to fetch credentials: {e}")
-
-def save_token_to_cloud(token_json):
-    # Implement your cloud storage logic here
-    # This could be an API call to save the token to a database or cloud storage
-    # For example, you could use a Google Cloud Storage bucket or an AWS S3 bucket
-    pass
-
 def get_credentials():
-    token_data = fetch_token()
-    if token_data:
-        creds = Credentials.from_authorized_user_info(token_data, SCOPES)
-        if creds and creds.expired and creds.refresh_token:
-            try:
-                creds.refresh(requests.Request())
-                save_token_to_cloud(creds.to_json())
-            except Exception as e:
-                st.error(f"Error refreshing token: {e}")
-                authenticate_and_save_credentials()
-                return get_credentials()
+    try:
+        creds = Credentials.from_authorized_user_info(json.loads(token_json), SCOPES)
         return creds
-    return None
+    except Exception as e:
+        st.error(f"Failed to obtain credentials: {e}")
+        return None
 
 def combine_pdfs(fname):
     creds = get_credentials()
