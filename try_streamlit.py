@@ -967,7 +967,6 @@ def authenticate_and_save_credentials():
         token_file.write(creds.to_json())
 
 def get_credentials():
-    if os.path.exists(TOKEN_FILE):
         try:
             with open(TOKEN_FILE, 'r') as token_file:
                 token_json = token_file.read().strip()
@@ -998,10 +997,10 @@ def get_credentials():
             st.error(f"Failed to obtain credentials from file: {e}")
             authenticate_and_save_credentials()  # Re-authenticate if other errors occur
             return get_credentials()  # Retry to get credentials after re-authentication
-    else:
-        st.info("Token file not found. Starting authentication...")
-        authenticate_and_save_credentials()  # Start authentication if file is not found
-        return get_credentials()  # Retry to get credentials after authentication
+    # else:
+    #     st.info("Token file not found. Starting authentication...")
+    #     authenticate_and_save_credentials()  # Start authentication if file is not found
+    #     return get_credentials()  # Retry to get credentials after authentication
 
 
 def combine_pdfs(fname):
