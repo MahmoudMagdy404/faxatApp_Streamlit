@@ -1076,7 +1076,13 @@ def get_credentials():
     
     if not token_data:
         st.warning("No token found in GitHub. Initiating new authentication flow.")
-        return initiate_auth_flow()
+        flow = InstalledAppFlow.from_client_config(
+            json.loads(st.secrets["google_credentials"]["credentials_json"]),
+            SCOPES
+        )
+        creds = flow.run_local_server(port=0)
+        write_token_to_github(json.loads(creds.to_json()))
+        return creds
     
     creds = Credentials.from_authorized_user_info(token_data, SCOPES)
     
@@ -1085,35 +1091,14 @@ def get_credentials():
             creds.refresh(Request())
             write_token_to_github(json.loads(creds.to_json()))
         else:
-            return initiate_auth_flow()
+            flow = InstalledAppFlow.from_client_config(
+                json.loads(st.secrets["google_credentials"]["credentials_json"]),
+                SCOPES
+            )
+            creds = flow.run_local_server(port=0)
+            write_token_to_github(json.loads(creds.to_json()))
     
     return creds
-
-def initiate_auth_flow():
-    flow = Flow.from_client_config(
-        json.loads(st.secrets["google_credentials"]["credentials_json"]),
-        scopes=SCOPES,
-        redirect_uri=st.secrets["google_credentials"]["redirect_uri"]
-    )
-    
-    auth_url, _ = flow.authorization_url(prompt='consent')
-    
-    st.write("Please visit this URL to authorize the application:")
-    st.markdown(f"[Google Auth URL]({auth_url})")
-    
-    code = st.text_input("Enter the authorization code:")
-    if code:
-        try:
-            flow.fetch_token(code=code)
-            creds = flow.credentials
-            write_token_to_github(json.loads(creds.to_json()))
-            st.success("Successfully authenticated!")
-            return creds
-        except Exception as e:
-            st.error(f"An error occurred: {e}")
-            return None
-    
-    return None
 
 def combine_pdfs(fname):
     """Combine PDFs from Google Drive folder."""
