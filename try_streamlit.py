@@ -27,6 +27,9 @@ from email.mime.application import MIMEApplication
 from googleapiclient.http import MediaIoBaseDownload, MediaFileUpload
 import logging
 import html
+from google.auth.transport.requests import Request
+
+
 style = """
 <style>
             body {
@@ -85,8 +88,8 @@ style = """
 """
 
 
-def generate_cover_page_html(chaser_name, to_name, fax_subject, fax_message, date, sender_email, receiver_number):
-    html_body = f"""
+def generate_cover_page_html(chaser_name, to_name, fax_subject, fax_message, date, sender_email, receiver_number ):
+    html_body = f"""9
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -116,7 +119,7 @@ def generate_cover_page_html(chaser_name, to_name, fax_subject, fax_message, dat
             <div style="font-weight: bold; font-size: 22px; margin-bottom: 10px;">From</div>
             <div style="font-size: 18px;">
                 Name: {chaser_name}<br>
-                Fax number: {sender_email}
+                Fax number: 
             </div>
         </div>
     </div>
@@ -174,6 +177,7 @@ BracesForms = {
         'L3916': 'https://docs.google.com/forms/d/e/1FAIpQLSd4XQox2yt3wsild0InVMgagrcQ9Aors4PjExoOILHiT9grew/formResponse'
     }
 }
+
 chasers_dict = {
     "Olivia Smith":"(941) 293-1794" , "Mia Martin":"(352) 718-1524",
     "Lexi Thomas":"(607) 383-2941" , "Mark Wilson":"(754) 250-1426",
@@ -712,6 +716,72 @@ def resend_humble(fax_id):
     else:
         logger.error("Failed to send HumbleFax")
         return {"Status": "Failed", "Result": "Failed to send fax"}
+
+
+
+# Constants and secrets
+HUMBLEFAX_API_BASE_URL = "https://api.humblefax.com"
+access_key = st.secrets["humble_access_key"]["access_key"]
+secret_key = st.secrets["humble_secret_key"]["secret_key"]
+CSV_URL = "https://raw.githubusercontent.com/MahmoudMagdy404/files_holder/main/humble_outbox.csv?token=GHSAT0AAAAAACU33HXMATERVLTKMIHDCDSEZVHWI5Q"
+
+def get_humblefax_details(fax_id):
+    url = f"{HUMBLEFAX_API_BASE_URL}/sentFax/{fax_id}"
+    auth = (access_key, secret_key)
+    try:
+        response = requests.get(url, auth=auth)
+        response.raise_for_status()
+
+        fax_data = response.json().get("data", {}).get("sentFax", {})
+        recipient = fax_data.get("recipients", [{}])[0]
+
+        fax_details = {
+            'FaxID': fax_id,
+            'ToFaxNumber': recipient.get('toNumber', ''),
+            'DateSent': datetime.datetime.utcfromtimestamp(int(fax_data.get('timestamp', 0))).strftime('%Y-%m-%d %H:%M:%S'),
+            'SentStatus': fax_data.get('status', ''),
+            'FileName': fax_data.get('subject', ''),  # Assuming subject as file name
+            'Service': 'HumbleFax'
+        }
+        return fax_details
+
+    except requests.exceptions.RequestException as e:
+        print(f"Failed to retrieve fax details for fax_id {fax_id}: {e}")
+        return None
+
+def list_sent_faxes():
+    url = f"{HUMBLEFAX_API_BASE_URL}/sentFaxes"
+    headers = {
+        "Authorization": f"Basic {base64.b64encode(f'{access_key}:{secret_key}'.encode()).decode()}"
+    }
+    
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        print(f"Failed to get HumbleFax outbox: {response.text}")
+        return None
+
+def check_and_save_fax_details(fax_details):
+    try:
+        # Read the existing CSV file
+        df = pd.read_csv(CSV_URL)
+    except pd.errors.EmptyDataError:
+        df = pd.DataFrame(columns=['FaxID', 'ToFaxNumber', 'DateSent', 'SentStatus', 'FileName', 'Service'])
+    
+    # Check if the fax ID already exists
+    if fax_details['FaxID'] in df['FaxID'].values:
+        print("Fax ID already exists. No new faxes sent.")
+        return df
+
+    # Append new fax details
+    df = df.append(fax_details, ignore_index=True)
+
+    # Save back to CSV
+    df.to_csv(CSV_URL, index=False)
+    
+    return df
+
 def on_row_select():
     if 'selected_fax_index' in st.session_state and st.session_state['selected_fax_index'] is not None:
         selected_fax = st.session_state['faxes_df'].iloc[st.session_state['selected_fax_index']]
@@ -952,36 +1022,93 @@ SCOPES = ["https://www.googleapis.com/auth/drive"]
 #     return creds
 # Define SCOPES
 
+# Constants
 SCOPES = ["https://www.googleapis.com/auth/drive"]
+FOLDER_ID = "15I95Loh35xI2PcGa36xz7SgMtclo-9DC"
+GITHUB_USER = 'MahmoudMagdy404'
+GITHUB_PAO = st.secrets["github_token"]["token"]
+TOKEN_FILE_URL = "https://api.github.com/repos/MahmoudMagdy404/files_holder/contents/token.json"
 
-# Load credentials from secrets
-try:
-    credentials_json = st.secrets["google_credentials"]["credentials_json"]
-    token_json = st.secrets["google_credentials"]["token_json"]
-except KeyError as e:
-    st.error(f"Missing key in secrets: {e}")
-    st.stop()
+def read_token_from_github():
+    """Read the token from GitHub repository."""
+    github_session = requests.Session()
+    github_session.auth = (GITHUB_USER, GITHUB_PAO)
+    try:
+        response = github_session.get(TOKEN_FILE_URL)
+        response.raise_for_status()
+        content = response.json()['content']
+        decoded_content = base64.b64decode(content).decode('utf-8')
+        return json.loads(decoded_content)
+    except Exception as e:
+        st.error(f"Failed to read token from GitHub: {e}")
+        return None
+
+def write_token_to_github(token_data):
+    """Write the token to GitHub repository."""
+    github_session = requests.Session()
+    github_session.auth = (GITHUB_USER, GITHUB_PAO)
+    try:
+        response = github_session.get(TOKEN_FILE_URL)
+        response.raise_for_status()
+        current_file = response.json()
+        
+        content = base64.b64encode(json.dumps(token_data).encode()).decode()
+        
+        data = {
+            "message": "Update token.json",
+            "content": content,
+            "sha": current_file['sha']
+        }
+        
+        response = github_session.put(TOKEN_FILE_URL, json=data)
+        response.raise_for_status()
+        st.success("Token updated successfully in GitHub.")
+    except Exception as e:
+        st.error(f"Failed to write token to GitHub: {e}")
 
 def get_drive_service(creds):
+    """Get Google Drive service."""
     return build('drive', 'v3', credentials=creds)
 
 def get_credentials():
-    try:
-        creds = Credentials.from_authorized_user_info(json.loads(token_json), SCOPES)
+    """Get or refresh Google credentials."""
+    token_data = read_token_from_github()
+    
+    if not token_data:
+        st.warning("No token found in GitHub. Initiating new authentication flow.")
+        flow = InstalledAppFlow.from_client_config(
+            json.loads(st.secrets["google_credentials"]["credentials_json"]),
+            SCOPES
+        )
+        creds = flow.run_local_server(port=0)
+        write_token_to_github(json.loads(creds.to_json()))
         return creds
-    except Exception as e:
-        st.error(f"Failed to obtain credentials: {e}")
-        return None
+    
+    creds = Credentials.from_authorized_user_info(token_data, SCOPES)
+    
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+            write_token_to_github(json.loads(creds.to_json()))
+        else:
+            flow = InstalledAppFlow.from_client_config(
+                json.loads(st.secrets["google_credentials"]["credentials_json"]),
+                SCOPES
+            )
+            creds = flow.run_local_server(port=0)
+            write_token_to_github(json.loads(creds.to_json()))
+    
+    return creds
 
 def combine_pdfs(fname):
+    """Combine PDFs from Google Drive folder."""
     creds = get_credentials()
     if not creds:
         return None, "Failed to obtain valid credentials. Please try authenticating again."
 
     try:
         service = get_drive_service(creds)
-        folder_id = "15I95Loh35xI2PcGa36xz7SgMtclo-9DC"
-        query = f"'{folder_id}' in parents"
+        query = f"'{FOLDER_ID}' in parents"
 
         st.info("Querying Google Drive...")
         results = service.files().list(q=query, pageSize=20, fields="nextPageToken, files(id, name, mimeType)").execute()
@@ -1036,7 +1163,6 @@ def combine_pdfs(fname):
     except Exception as error:
         st.error(f"An error occurred: {str(error)}")
         return None, str(error)
-
     
 def main():
     # Sidebar navigation
