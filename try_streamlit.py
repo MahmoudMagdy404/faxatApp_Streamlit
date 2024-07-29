@@ -87,55 +87,63 @@ style = """
 
 def generate_cover_page_html(chaser_name, to_name, fax_subject, fax_message, date, sender_email, receiver_number):
     html_body = f"""
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Fax Cover Sheet</title>
-    </head>
-    <body style="font-family: Arial, sans-serif; line-height: 1.8; margin: 0; padding: 40px; font-size: 18px; max-width: 210mm; min-height: 297mm;">
-        <h1 style="font-size: 60px; font-weight: bold; margin-bottom: 40px;">FAX</h1>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 40px;">
-            <div style="margin-bottom: 30px;">
-                <div style="font-weight: bold; font-size: 22px; margin-bottom: 10px;">To</div>
-                <div style="font-size: 18px;">
-                    Name: {to_name}<br>
-                    Fax number: {receiver_number}
-                </div>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fax Cover Sheet</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.8; margin: 0; padding: 40px; font-size: 18px; max-width: 210mm; min-height: 297mm; position: relative;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px;">
+        <h1 style="font-size: 60px; font-weight: bold;">FAX</h1>
+        <div style="text-align: right;">
+            <div style="font-weight: bold; font-size: 22px;">InCall Medical Supplies</div>
+            <div>Phone: (754) 250-1426</div>
+            <div>Fax1: (510) 890-3073</div>
+            <div>Fax2: (888) 851-6047</div>
+        </div>
+    </div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 40px;">
+        <div style="margin-bottom: 30px;">
+            <div style="font-weight: bold; font-size: 22px; margin-bottom: 10px;">To</div>
+            <div style="font-size: 18px;">
+                Name: {to_name}<br>
+                Fax number: {receiver_number}
             </div>
-            <div style="margin-bottom: 30px;">
-                <div style="font-weight: bold; font-size: 22px; margin-bottom: 10px;">From</div>
-                <div style="font-size: 18px;">
-                    Name: {chaser_name}<br>
-                    Fax number: {sender_email}
-                </div>
+        </div>
+        <div style="margin-bottom: 30px;">
+            <div style="font-weight: bold; font-size: 22px; margin-bottom: 10px;">From</div>
+            <div style="font-size: 18px;">
+                Name: {chaser_name}<br>
+                Fax number: {sender_email}
             </div>
         </div>
-        <div style="margin-bottom: 30px;">
-            <div style="font-weight: bold; font-size: 22px; margin-bottom: 10px;">Number of pages: 2</div>
-            <div style="font-size: 18px;"></div>
-        </div>
-        <div style="margin-bottom: 30px;">
-            <div style="font-weight: bold; font-size: 22px; margin-bottom: 10px;">Subject: </div>
-            <div style="font-size: 18px;">{fax_subject}</div>
-        </div>
-        <div style="margin-bottom: 30px;">
-            <div style="font-weight: bold; font-size: 22px; margin-bottom: 10px;">Date:</div>
-            <div style="font-size: 18px;">{date}</div>
-        </div>
-        <div style="margin: 40px 0; border-top: 2px solid #000; border-bottom: 2px solid #000; padding: 20px 0; font-size: 22px;">
-            <span style="margin-right: 40px;">☐ Urgent</span>
-            <span style="margin-right: 40px;">☐ For Review</span>
-            <span style="margin-right: 40px;">☐ Please Reply</span>
-            <span>☑ Confidential</span>
-        </div>
-        <div style="margin-bottom: 30px;">
-            <div style="font-weight: bold; font-size: 24px; margin-bottom: 15px;">Message:</div>
-            <div style="font-size: 18px;">{fax_message}</div>
-        </div>
-    </body>
-    </html>
+    </div>
+    <div style="margin-bottom: 30px;">
+        <div style="font-weight: bold; font-size: 22px; margin-bottom: 10px;">Number of pages: 2</div>
+        <div style="font-size: 18px;"></div>
+    </div>
+    <div style="margin-bottom: 30px;">
+        <div style="font-weight: bold; font-size: 22px; margin-bottom: 10px;">Subject: </div>
+        <div style="font-size: 18px;">{fax_subject}</div>
+    </div>
+    <div style="margin-bottom: 30px;">
+        <div style="font-weight: bold; font-size: 22px; margin-bottom: 10px;">Date:</div>
+        <div style="font-size: 18px;">{date}</div>
+    </div>
+    <div style="margin: 40px 0; border-top: 2px solid #000; border-bottom: 2px solid #000; padding: 20px 0; font-size: 22px;">
+        <span style="margin-right: 40px; font-weight: bold;">☐ Urgent</span>
+        <span style="margin-right: 40px; font-weight: bold;">☐ For Review</span>
+        <span style="margin-right: 40px; font-weight: bold;">☐ Please Reply</span>
+        <span style="font-weight: bold;">☑ Confidential</span>
+    </div>
+    <div style="margin-bottom: 30px;">
+        <div style="font-weight: bold; font-size: 24px; margin-bottom: 15px;">Message:</div>
+        <div style="font-size: 18px;">{fax_message}</div>
+    </div>
+</body>
+</html> 
     """
     return html_body
 
@@ -328,7 +336,6 @@ def handle_hallofax(combined_pdf, receiver_number, fax_message, fax_subject, to_
     # Return True if successful, False otherwise
     return True
 #TODO -> Try to fix it
-
 
 
 def handle_faxplus(uploaded_file, receiver_number, fax_message, fax_subject, to_name, chaser_name, uploaded_cover_sheet):
