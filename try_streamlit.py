@@ -119,7 +119,7 @@ def generate_cover_page_html(chaser_name, to_name, fax_subject, fax_message, dat
             <div style="font-weight: bold; font-size: 22px; margin-bottom: 10px;">From</div>
             <div style="font-size: 18px;">
                 Name: {chaser_name}<br>
-                Fax number: 
+                Fax number: 737 241 2558
             </div>
         </div>
     </div>
