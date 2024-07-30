@@ -152,7 +152,7 @@ def generate_cover_page_html(chaser_name, to_name, fax_subject, fax_message, dat
 
 
 # Define the braces and their forms
-Braces = ["Back", "Knees", "Elbow", "Shoulder", "Ankle", "Wrists"]
+Braces = ["Back", "Knees", "Elbow", "Shoulder", "Ankle", "Wrists" , "Nick"]
 BracesForms = {
     "Back": {
         'L0637': 'https://docs.google.com/forms/d/e/1FAIpQLSfB7423u2nFC_boKiOq8w-8E6ClY9iY2QLW_-_-SLQwJfbdZg/formResponse',
@@ -175,6 +175,9 @@ BracesForms = {
     },
     "Wrists": {
         'L3916': 'https://docs.google.com/forms/d/e/1FAIpQLSd4XQox2yt3wsild0InVMgagrcQ9Aors4PjExoOILHiT9grew/formResponse'
+    },
+    "Nick":{
+        "L0174" : "https://docs.google.com/forms/d/e/1FAIpQLSf0_yOLpX_JGSEJ1CUixkXlkDwi7kl2gwrsunb2IdbtQjPAvg/formResponse"
     }
 }
 
@@ -1214,20 +1217,32 @@ def main():
         st.header("Select Braces")
         brace_columns = st.columns(len(Braces))
         selected_forms = {}
+        # Create two rows of columns: 3 columns in the first row, 4 columns in the second row
+        col1, col2, col3 = st.columns(3)
+        col4, col5, col6, col7 = st.columns(4)
 
-        for idx, brace in enumerate(Braces):
+        # Function to handle displaying the braces and their forms
+        def display_brace(brace, column):
             if brace not in st.session_state:
                 st.session_state[brace] = "None"
 
-            with brace_columns[idx]:
+            with column:
                 st.subheader(f"{brace} Brace")
                 brace_options = ["None"] + list(BracesForms[brace].keys())
                 selected_forms[brace] = st.radio(
-                    f"Select {brace} Brace Type",
+                    f"Select {brace} Brace",
                     brace_options,
                     key=brace,
                     index=brace_options.index(st.session_state[brace])
                 )
+
+        # Display the first 3 braces in the first row
+        for idx, brace in enumerate(Braces[:3]):
+            display_brace(brace, [col1, col2, col3][idx])
+
+        # Display the remaining 4 braces in the second row
+        for idx, brace in enumerate(Braces[3:]):
+            display_brace(brace, [col4, col5, col6, col7][idx])
 
         def validate_all_fields():
             required_fields = [
