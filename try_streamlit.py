@@ -102,7 +102,6 @@ def generate_cover_page_html(chaser_name, to_name, fax_subject, fax_message, dat
         <h1 style="font-size: 60px; font-weight: bold;">FAX</h1>
         <div style="text-align: right;">
             <div style="font-weight: bold; font-size: 22px;">InCall Medical Supplies</div>
-            <div>Phone: (754) 250-1426</div>
             <div>Fax1: (510) 890-3073</div>
             <div>Fax2: (888) 851-6047</div>
         </div>
