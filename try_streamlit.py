@@ -175,7 +175,7 @@ BracesForms = {
     "Wrists": {
         'L3916': 'https://docs.google.com/forms/d/e/1FAIpQLSd4XQox2yt3wsild0InVMgagrcQ9Aors4PjExoOILHiT9grew/formResponse'
     },
-    "Nick":{
+    "Neck":{
         "L0174" : "https://docs.google.com/forms/d/e/1FAIpQLSf0_yOLpX_JGSEJ1CUixkXlkDwi7kl2gwrsunb2IdbtQjPAvg/formResponse"
     }
 }
