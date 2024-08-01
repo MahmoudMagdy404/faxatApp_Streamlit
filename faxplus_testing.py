@@ -151,3 +151,149 @@ else:
                 st.info("No faxes found for the given criteria.")
         except Exception as e:
             st.error(f"Error: {str(e)}")
+            
+            
+            
+            
+            
+def generate_prescription_request_html(date, fname, lname, ptPhone, ptAddress, ptCity, ptState, ptZip, ptDob, medID, ptHeight, ptWeight, ptGender, drName, drAddress, drCity, drState, drZip, drPhone, drFax, drNpi):
+    html_body = f"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prior Authorization Prescription Request Form</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; margin: 0; padding: 20px; font-size: 12px; max-width: 210mm; min-height: 297mm;">
+    <div style="text-align: center; margin-bottom: 20px;">
+        <h2 style="font-size: 18px;">PRIOR AUTHORIZATION PRESCRIPTION REQUEST FORM</h2>
+        <p>PLEASE SEND THIS FORM BACK IN 3 BUSINESS DAYS</p>
+        <p>WITH THE PT CHART NOTES ( RECENT MEDICAL RECORDS ) AND THE FAX COVER SHEET</p>
+    </div>
+    
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+        <div style="border: 1px solid #000; padding: 10px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                <div>Date: {date}</div>
+                <div>First: {fname}</div>
+                <div>Last: {lname}</div>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                <div>DOB: {ptDob}</div>
+                <div>Gender: {ptGender}</div>
+            </div>
+            <div style="margin-bottom: 5px;">Address: {ptAddress}</div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                <div>City: {ptCity}</div>
+                <div>State: {ptState}</div>
+                <div>Postal Code: {ptZip}</div>
+            </div>
+            <div style="margin-bottom: 5px;">Patient Phone Number: {ptPhone}</div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                <div>Primary Insurance: Medicare</div>
+                <div>ID/HICN/MBI: {medID}</div>
+            </div>
+                     <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                <div>Private Ins: </div>
+                <div>Policy #:{medID}</div>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                <div>Height: {ptHeight}</div>
+                <div>Weight: {ptWeight}</div>
+            </div>
+        </div>
+        
+        <div style="border: 1px solid #000; padding: 10px;">
+            <div style="margin-bottom: 5px;">Physician Name: {drName}</div>
+            <div style="margin-bottom: 5px;">NPI: {drNpi}</div>
+            <div style="margin-bottom: 5px;">Address: {drAddress}</div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                <div>City: {drCity}</div>
+                <div>State: {drState}</div>
+                <div>Postal code: {drZip}</div>
+            </div>
+            <div style="margin-bottom: 5px;">Phone Number: {drPhone}</div>
+            <div style="margin-bottom: 5px;">Fax Number: {drFax}</div>
+        </div>
+    </div>
+    
+    <div style="margin-top: 20px;">
+        <h3 style="font-size: 14px;">DIAGNOSIS: Provider can specify all of the diagnosis which they feel is appropriate</h3>
+        <div style="margin-bottom: 5px;">
+            <input type="checkbox" id="diag1" name="diag1">
+            <label for="diag1">Primary osteoarthritis, right ankle and foot (M19.071)</label>
+        </div>
+        <div style="margin-bottom: 5px;">
+            <input type="checkbox" id="diag2" name="diag2">
+            <label for="diag2">Primary osteoarthritis, left ankle and foot (M19.072)</label>
+        </div>
+        <div style="margin-bottom: 5px;">
+            <input type="checkbox" id="diag2" name="diag2">
+            <label for="diag2">Primary osteoarthritis, left ankle and foot (M19.072)</label>
+        </div>
+        <div style="margin-bottom: 5px;">
+            <input type="checkbox" id="diag2" name="diag2">
+            <label for="diag2">Primary osteoarthritis, left ankle and foot (M19.072)</label>
+        </div>
+                <div style="margin-bottom: 5px;">
+            <input type="checkbox" id="diag2" name="diag2">
+            <label for="diag2">Primary osteoarthritis, left ankle and foot (M19.072)</label>
+        </div>
+                <div style="margin-bottom: 5px;">
+            <input type="checkbox" id="diag2" name="diag2">
+            <label for="diag2">Primary osteoarthritis, left ankle and foot (M19.072)</label>
+        </div>
+                <div style="margin-bottom: 5px;">
+            <input type="checkbox" id="diag2" name="diag2">
+            <label for="diag2">Primary osteoarthritis, left ankle and foot (M19.072)</label>
+        </div>
+                <div style="margin-bottom: 5px;">
+            <input type="checkbox" id="diag2" name="diag2">
+            <label for="diag2">Primary osteoarthritis, left ankle and foot (M19.072)</label>
+        </div>
+                <div style="margin-bottom: 5px;">
+            <input type="checkbox" id="diag2" name="diag2">
+            <label for="diag2">Primary osteoarthritis, left ankle and foot (M19.072)</label>
+        </div>
+                <div style="margin-bottom: 5px;">
+            <input type="checkbox" id="diag2" name="diag2">
+            <label for="diag2">Sprain of unspecified ligament of right ankle (S93.401)</label>
+        </div>
+        
+    </div>
+    
+    <div style="border: 1px solid #000; padding: 10px; margin-top: 20px;">
+        <h3 style="font-size: 14px;">AFFECTED AREA</h3>
+        <div style="display: flex; justify-content: ;">
+            <div>
+                <input type="checkbox" id="leftAnkle" name="leftAnkle">
+                <label for="leftAnkle">Left ankle</label>
+            </div>
+            <div>
+                <input type="checkbox" id="rightAnkle" name="rightAnkle">
+                <label for="rightAnkle">Right Ankle</label>
+            </div>
+        </div>
+    </div>
+    
+    <div style="border: 1px solid #000; padding: 10px; margin-top: 20px;">
+        <h3 style="font-size: 14px;">DISPENSE</h3>
+        <p>L1971: Ankle foot orthosis, plastic or other material with ankle joint, prefabricated, includes fitting and adjustment</p>
+        <p>Length of need is 99 months unless otherwise specified: _____ 99-99 (LIFETIME)</p>
+    </div>
+    
+    <div style="border: 1px solid #000; padding: 10px; margin-top: 20px;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+            <div>Physician Signature: _________________________</div>
+            <div>Date signed: _________________________</div>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+            <div>Physician Name: {drName}</div>
+            <div>NPI: {drNpi}</div>
+        </div>
+    </div>
+</body>
+</html>
+    """
+    return html_body
