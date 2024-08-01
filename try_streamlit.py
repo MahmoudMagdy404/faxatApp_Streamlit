@@ -151,7 +151,7 @@ def generate_cover_page_html(chaser_name, to_name, fax_subject, fax_message, dat
 
 
 # Define the braces and their forms
-Braces = ["Back", "Knees", "Elbow", "Shoulder", "Ankle", "Wrists" , "Nick"]
+Braces = ["Back", "Knees", "Elbow", "Shoulder", "Ankle", "Wrists" , "Neck"]
 BracesForms = {
     "Back": {
         'L0637': 'https://docs.google.com/forms/d/e/1FAIpQLSfB7423u2nFC_boKiOq8w-8E6ClY9iY2QLW_-_-SLQwJfbdZg/formResponse',

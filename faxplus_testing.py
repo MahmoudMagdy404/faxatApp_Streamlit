@@ -10,15 +10,13 @@ import requests
 import base64
 from datetime import datetime, timedelta
 import pytz
-
+from faxplus import ApiClient, Configuration
+from faxplus.api.faxes_api import FaxesApi
 # OAuth configuration
 AUTH_URL = "https://accounts.fax.plus/login"
 TOKEN_URL = "https://accounts.fax.plus/token"
-REDIRECT_URI = "http://192.168.168.183:8503/"  # Update this to your Streamlit app's URL
+REDIRECT_URI = "http://192.168.168.183:8501/"  # Update this to your Streamlit app's URL
 API_BASE_URL = "https://restapi.fax.plus/v3"
-
-
-
 
 # Load secrets
 client_id = st.secrets["faxplus_auth"]["client_id"]
@@ -44,7 +42,6 @@ def exchange_code_for_tokens(code):
     else:
         raise Exception(f"Failed to exchange code for tokens. Status code: {response.status_code}, Response: {response.text}")
 
-
 # Function to refresh access token
 def refresh_access_token(refresh_token):
     url = f"{TOKEN_URL}?grant_type=refresh_token&refresh_token={refresh_token}"
@@ -57,50 +54,39 @@ def refresh_access_token(refresh_token):
         return response.json()
     else:
         raise Exception(f"Failed to refresh access token: {response.text}")
-
-
-def upload_file(file, access_token):
-    url = f"{API_BASE_URL}/accounts/self/files?format=pdf"
-    headers = {
-        "Authorization": f"Bearer {access_token}",
-        "x-fax-clientid": client_id
-    }
-    files = {"fax_file": file}
     
-    response = requests.post(url, headers=headers, files=files)
-    if response.status_code == 200:
-        return response.json()["path"]
-    else:
-        raise Exception(f"File upload failed: {response.text}")
-
-
-def send_fax(to_numbers, file_paths, message, access_token):
-    url = f"{API_BASE_URL}/accounts/self/outbox"
-    headers = {
-        "Authorization": f"Bearer {access_token}",
-        "x-fax-clientid": client_id,
-        "Content-Type": "application/json"
-    }
+def list_faxes(access_token, category, after, before, limit):
+    conf = Configuration()
+    conf.access_token = access_token
+    api_client = ApiClient(header_name='x-fax-clientid', header_value=client_id, configuration=conf)
+    api = FaxesApi(api_client)
     
-    current_time = datetime.now(pytz.utc).strftime("%Y-%m-%d %H:%M:%S +0000")
-
-    payload = {
-        "to": to_numbers,
-        "files": file_paths,
-        "comment": {
-            "text": message
-        },
-        "send_time": current_time
-    }
-
-    response = requests.post(url, headers=headers, json=payload)
-    if response.status_code == 200:
-        return response.json()
-    else:
-        raise Exception(f"Fax sending failed. Status code: {response.status_code}, Response: {response.text}")
+    try:
+        st.write(f"Calling list_faxes with parameters:")
+        st.write(f"user_id: {user_id}")
+        st.write(f"category: {category}")
+        st.write(f"after: {after}")
+        st.write(f"before: {before}")
+        st.write(f"limit: {limit}")
+        
+        resp = api.list_faxes(
+            user_id=user_id,
+            category=category,
+            after=after,
+            before=before,
+            limit=int(limit)
+        )
+        return resp.data.records
+    except Exception as e:
+        st.write(f"Exception details: {str(e)}")
+        if hasattr(e, 'body'):
+            st.write(f"Response body: {e.body}")
+        if hasattr(e, 'headers'):
+            st.write(f"Response headers: {e.headers}")
+        raise Exception(f"Failed to list faxes: {str(e)}")
 
 # Streamlit app
-st.title("FaxPlus OAuth and Fax Sender")
+st.title("FaxPlus OAuth and Fax Listing")
 
 if 'access_token' not in st.session_state:
     # OAuth flow
@@ -114,7 +100,7 @@ if 'access_token' not in st.session_state:
             st.session_state.token_expiry = datetime.now() + timedelta(seconds=expires_in)
             st.success("Authorization successful!")
             st.query_params.clear()
-            st.experimental_rerun()  # Rerun the app to show fax sending fields
+            st.experimental_rerun()  # Rerun the app to show fax listing fields
         except Exception as e:
             st.error(f"Authorization failed: {str(e)}")
     else:
@@ -134,35 +120,34 @@ else:
             st.session_state.pop('refresh_token', None)
             st.experimental_rerun()
 
-    # Fax sending interface
-    st.write("Send a fax:")
-    to_numbers = st.text_input("Enter fax numbers (comma-separated)", "+12345688,+12345699")
-    uploaded_files = st.file_uploader("Upload files to fax", accept_multiple_files=True)
-    message = st.text_area("Enter fax message", "This is a test fax sent from Streamlit.")
+    # After successful authentication
+    st.write(f"Access Token: {st.session_state.access_token[:10]}...")  # Show first 10 characters
+    st.write(f"User ID: {user_id}")
+    st.write(f"Client ID: {client_id}")
 
-    # In the Streamlit app:
-    if st.button("Send Fax"):
-        if not uploaded_files:
-            st.error("Please upload at least one file.")
-        else:
-            try:
-                # Upload files
-                uploaded_file_paths = []
-                for file in uploaded_files:
-                    file_path = upload_file(file, st.session_state.access_token)
-                    uploaded_file_paths.append(file_path['path'])
-                
-                st.write(f"Files uploaded successfully. Paths: {uploaded_file_paths}")
-                
-                # Send fax
-                to_numbers_list = [num.strip() for num in to_numbers.split(',')]
-                result = send_fax(to_numbers_list, uploaded_file_paths, message, st.session_state.access_token)
-                st.success("Fax sent successfully!")
-                st.json(result)
-            except Exception as e:
-                st.error(f"Error: {str(e)}")
+    # Fax listing interface
+    st.write("List Faxes:")
+    category = st.selectbox("Select category", ["inbox", "sent", "spam"])
+    after = st.date_input("Start date", datetime.now(pytz.utc) - timedelta(days=30))
+    before = st.date_input("End date", datetime.now(pytz.utc))
+    limit = st.number_input("Limit", min_value=1, max_value=100, value=50)
 
-    if st.button("Logout"):
-        st.session_state.pop('access_token', None)
-        st.session_state.pop('refresh_token', None)
-        st.experimental_rerun()
+    if st.button("List Faxes"):
+        try:
+            after_str = after.strftime("%Y-%m-%d 00:00:00")
+            before_str = before.strftime("%Y-%m-%d 23:59:59")
+            faxes = list_faxes(st.session_state.access_token, category, after_str, before_str, limit)
+            
+            if faxes:
+                st.success(f"Retrieved {len(faxes)} faxes.")
+                for fax in faxes:
+                    st.write(f"Fax ID: {fax.id}")
+                    st.write(f"From: {fax.from_number}")
+                    st.write(f"To: {fax.to}")
+                    st.write(f"Status: {fax.status}")
+                    st.write(f"Date: {fax.start_time}")
+                    st.write("---")
+            else:
+                st.info("No faxes found for the given criteria.")
+        except Exception as e:
+            st.error(f"Error: {str(e)}")
