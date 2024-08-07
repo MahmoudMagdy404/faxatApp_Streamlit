@@ -791,147 +791,6 @@ def on_row_select():
     else:
         st.session_state['selected_fax_info'] = "No fax selected"
 
-# # Dropbox settings
-# DROPBOX_ACCESS_TOKEN = st.secrets["dropbox"]["access_token"]
-# TOKEN_FOLDER_PATH = '/Apps/faxat app' 
-# TOKEN_FILE_NAME = 'token.json'
-
-# SCOPES = ["https://www.googleapis.com/auth/drive"]
-
-# def get_dropbox_client():
-#     """Create and return a Dropbox client."""
-#     try:
-#         client = dropbox.Dropbox(DROPBOX_ACCESS_TOKEN)
-#         client.users_get_current_account()
-#         return client
-#     except dropbox.exceptions.AuthError:
-#         st.error("Dropbox authentication error. Please check your access token.")
-#         return None
-
-# def download_token_from_dropbox():
-#     """Download the token file from Dropbox."""
-#     client = get_dropbox_client()
-#     if client is None:
-#         st.error("Cannot download token because Dropbox client is not authenticated.")
-#         return False
-
-#     try:
-#         metadata, response = client.files_download(f'{TOKEN_FOLDER_PATH}/{TOKEN_FILE_NAME}')
-#         with open(TOKEN_FILE_NAME, 'wb') as f:
-#             f.write(response.content)
-#         st.success('Token downloaded from Dropbox successfully!')
-#         return True
-#     except AuthError as e:
-#         st.error(f'Error downloading token: {e}')
-#         return False
-#     except dropbox.exceptions.ApiError as e:
-#         st.error(f'File not found: {e}')
-#         return False
-
-# def upload_token_to_dropbox():
-#     """Upload the token file to Dropbox."""
-#     client = get_dropbox_client()
-#     if client is None:
-#         st.error("Cannot upload token because Dropbox client is not authenticated.")
-#         return False
-
-#     try:
-#         with open(TOKEN_FILE_NAME, 'rb') as f:
-#             token_data = f.read()
-#         client.files_upload(token_data, f'{TOKEN_FOLDER_PATH}/{TOKEN_FILE_NAME}', mode=dropbox.files.WriteMode('overwrite'))
-#         st.success('Token uploaded to Dropbox successfully!')
-#         return True
-#     except AuthError as e:
-#         st.error(f'Error uploading token: {e}')
-#         return False
-
-# def get_credentials():
-#     """Get Google Drive credentials, refreshing or creating them as necessary."""
-#     creds = None
-
-#     # Download token from Dropbox if it exists
-#     if download_token_from_dropbox() and os.path.exists(TOKEN_FILE_NAME):
-#         creds = Credentials.from_authorized_user_file(TOKEN_FILE_NAME, SCOPES)
-    
-#     if not creds or not creds.valid:
-#         if creds and creds.expired and creds.refresh_token:
-#             creds.refresh(Request())
-#         else:
-#             credentials_json = st.secrets["google_credentials"]["credentials_json"]
-#             with open('credentials.json', 'w') as f:
-#                 f.write(credentials_json)
-                
-#             flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
-#             creds = flow.run_local_server(port=0)
-            
-#             with open(TOKEN_FILE_NAME, 'w') as token:
-#                 token.write(creds.to_json())
-            
-#             if not upload_token_to_dropbox():
-#                 st.warning("Failed to upload token to Dropbox. Using local token only.")
-    
-#     return creds
-# def get_drive_service(creds):
-#     return build("drive", "v3", credentials=creds)
-
-# def combine_pdfs(fname):
-#     creds = get_credentials()
-#     if not creds:
-#         return None, "Failed to obtain valid credentials. Please try authenticating again."
-
-#     try:
-#         service = get_drive_service(creds)
-#         folder_id = "15I95Loh35xI2PcGa36xz7SgMtclo-9DC"
-#         query = f"'{folder_id}' in parents"
-        
-#         st.write("Querying Google Drive...")
-#         results = service.files().list(q=query, pageSize=20, fields="nextPageToken, files(id, name, mimeType)").execute()
-#         items = results.get("files", [])
-        
-#         if not items:
-#             return None, "No files found in the specified folder."
-        
-#         fname = fname.strip()
-#         target_files = [file for file in items if fname in file["name"]]
-        
-#         if not target_files:
-#             return None, "No matching files found."
-        
-#         st.write(f"Found {len(target_files)} matching files. Combining PDFs...")
-        
-#         merger = PdfMerger()
-#         for target_file in target_files:
-#             mime_type = target_file.get("mimeType")
-#             file_id = target_file.get("id")
-            
-#             st.write(f"Processing file: {target_file['name']}")
-            
-#             if mime_type.startswith("application/vnd.google-apps."):
-#                 request = service.files().export_media(fileId=file_id, mimeType="application/pdf")
-#             else:
-#                 request = service.files().get_media(fileId=file_id)
-            
-#             fh = io.BytesIO()
-#             downloader = MediaIoBaseDownload(fh, request)
-#             done = False
-#             while not done:
-#                 status, done = downloader.next_chunk()
-#                 st.write(f"Download {int(status.progress() * 100)}%")
-#             fh.seek(0)
-            
-#             pdf_reader = PdfReader(fh)
-#             merger.append(pdf_reader)
-        
-#         st.write("Finalizing PDF...")
-#         output = io.BytesIO()
-#         merger.write(output)
-#         merger.close()
-#         output.seek(0)
-#         st.write("PDF combination complete!")
-#         return output, None
-#     except Exception as error:
-#         st.error(f"An error occurred: {str(error)}")
-#         return None, str(error)
 
 
 TOKEN_FOLDER_ID = '1HDwNvgFv_DSEH2WKNfLNheKXxKT_hDM9'
@@ -940,89 +799,7 @@ TOKEN_FILE_NAME = 'token.json'
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 # credentials_json = st.secrets["google_credentials"]["credentials_json"]
 
-# def get_drive_service():
-#     try:
-#         # Use service account credentials to access Google Drive
-#         creds = service_account.Credentials.from_service_account_info(json.loads(credentials_json))
-#     except Exception as e:
-#         print(f"Error loading service account credentials: {e}")
-#         return None
-#     return build('drive', 'v3', credentials=creds)
 
-# def download_file_from_drive(service, file_name, folder_id):
-#     try:
-#         query = f"'{folder_id}' in parents and name='{file_name}'"
-#         results = service.files().list(q=query, spaces='drive', fields="files(id, name)").execute()
-#         items = results.get('files', [])
-
-#         if not items:
-#             print(f'No {file_name} file found in Google Drive folder: {folder_id}')
-#             return None
-
-#         file_id = items[0]['id']
-#         request = service.files().get_media(fileId=file_id)
-#         fh = io.BytesIO()
-#         downloader = MediaIoBaseDownload(fh, request)
-#         done = False
-#         while not done:
-#             status, done = downloader.next_chunk()
-#             print(f"Download {int(status.progress() * 100)}%")
-#         fh.seek(0)
-#         return fh.read()
-
-#     except Exception as e:
-#         print(f'Error downloading {file_name}: {e}')
-#         return None
-
-# def upload_token_to_drive(service, creds):
-#     try:
-#         file_metadata = {
-#             'name': TOKEN_FILE_NAME,
-#             'parents': [TOKEN_FOLDER_ID]
-#         }
-#         media = MediaIoBaseUpload(io.BytesIO(creds.to_json().encode()), mimetype='application/json')
-
-#         query = f"'{TOKEN_FOLDER_ID}' in parents and name='{TOKEN_FILE_NAME}'"
-#         results = service.files().list(q=query, spaces='drive', fields="files(id, name)").execute()
-#         items = results.get('files', [])
-
-#         if items:
-#             file_id = items[0]['id']
-#             service.files().update(fileId=file_id, body=file_metadata, media_body=media).execute()
-#         else:
-#             service.files().create(body=file_metadata, media_body=media).execute()
-
-#         print('Token uploaded to Google Drive successfully!')
-#         return True
-#     except Exception as e:
-#         print(f'Error uploading token: {e}')
-#         return False
-
-# def get_credentials():
-#     creds = None
-#     service = get_drive_service()
-#     if service is None:
-#         return None
-    
-#     credentials_data = download_file_from_drive(service, CREDENTIALS_FILE_NAME, TOKEN_FOLDER_ID)
-#     if credentials_data:
-#         credentials_json = json.loads(credentials_data)
-#         flow = InstalledAppFlow.from_client_config(credentials_json, SCOPES)
-    
-#         token_data = download_file_from_drive(service, TOKEN_FILE_NAME, TOKEN_FOLDER_ID)
-#         if token_data:
-#             creds = Credentials.from_authorized_user_info(json.loads(token_data), SCOPES)
-    
-#         if not creds or not creds.valid:
-#             if creds and creds.expired and creds.refresh_token:
-#                 creds.refresh(Request())
-#             else:
-#                 creds = flow.run_local_server(port=0)
-            
-#             upload_token_to_drive(service, creds)
-    
-#     return creds
-# Define SCOPES
 
 # Constants
 SCOPES = ["https://www.googleapis.com/auth/drive"]
@@ -1165,6 +942,7 @@ def combine_pdfs(fname):
     except Exception as error:
         st.error(f"An error occurred: {str(error)}")
         return None, str(error)
+
     
 def main():
     # Sidebar navigation
@@ -1316,41 +1094,80 @@ def main():
 
     elif page == "Send Fax":
         st.title("Send Fax")
+        st.header("Upload PDF Files to be sent")
 
-        st.header("Combine PDFs")
-        # uploaded_cover_sheet = st.file_uploader("Upload Cover Sheet PDF (Optional)", type="pdf")
+        uploaded_files = st.file_uploader("Upload PDF Files", type="pdf", accept_multiple_files=True)
 
-        doctor_name = st.text_input("Enter Doctor Name for PDF combination")
-        if st.button("Combine PDFs"):
-            if doctor_name:
-                with st.spinner("Combining PDFs..."):
-                    combined_pdf, error = combine_pdfs(doctor_name)
-                    if error:
-                        st.error(f"Error combining PDFs: {error}")
-                    elif combined_pdf:
-                        st.success(f"Combined PDF for {doctor_name} created successfully.")
-                        st.session_state['combined_pdf'] = combined_pdf
-                        st.session_state['doctor_name'] = doctor_name
-                        st.experimental_rerun()
-                    else:
-                        st.error("Failed to create combined PDF. Please try again.")
-            else:
-                st.warning("Please enter a doctor name for PDF combination.")
+        if uploaded_files:
+            st.write(f"Uploaded {len(uploaded_files)} file(s):")
+            for uploaded_file in uploaded_files:
+                st.write(uploaded_file.name)
+                
+            if st.button("Process Uploaded PDFs"):
+                with st.spinner("Processing uploaded PDFs..."):
+                    # Here you would process the uploaded PDFs as needed.
+                    # For example, you could save them to a directory, merge them, or perform other operations.
+                    # This placeholder just combines the files without additional processing.
+                    
+                    # Example: Combine the uploaded PDFs into a single file (if needed)
+                    from PyPDF2 import PdfMerger
+                    merger = PdfMerger()
+                    
+                    for uploaded_file in uploaded_files:
+                        merger.append(uploaded_file)
+                    
+                    combined_output = io.BytesIO()
+                    merger.write(combined_output)
+                    merger.close()
+                    combined_output.seek(0)
+                    
+                    st.session_state['uploaded_pdfs'] = combined_output
+                    st.session_state['uploaded_pdfs_names'] = [file.name for file in uploaded_files]
+                    st.success("Uploaded PDFs processed successfully.")
+                    st.experimental_rerun()
 
-        if 'combined_pdf' in st.session_state:
+        if 'uploaded_pdfs' in st.session_state:
             st.download_button(
                 label="Download Combined PDF",
-                data=st.session_state['combined_pdf'].getvalue(),
-                file_name=f"{st.session_state['doctor_name']}_combined.pdf",
+                data=st.session_state['uploaded_pdfs'].getvalue(),
+                file_name="combined_uploaded_files.pdf",
                 mime="application/pdf"
             )
-            st.success("Combined PDF is ready for further processing (e.g., sending faxes).")
+            st.success("Uploaded PDF(s) are ready for further processing (e.g., sending faxes).")
+        # st.header("Combine PDFs")
+        # # uploaded_cover_sheet = st.file_uploader("Upload Cover Sheet PDF (Optional)", type="pdf")
+
+        # doctor_name = st.text_input("Enter Doctor Name for PDF combination")
+        # if st.button("Combine PDFs"):
+        #     if doctor_name:
+        #         with st.spinner("Combining PDFs..."):
+        #             combined_pdf, error = combine_pdfs(doctor_name)
+        #             if error:
+        #                 st.error(f"Error combining PDFs: {error}")
+        #             elif combined_pdf:
+        #                 st.success(f"Combined PDF for {doctor_name} created successfully.")
+        #                 st.session_state['combined_pdf'] = combined_pdf
+        #                 st.session_state['doctor_name'] = doctor_name
+        #                 st.experimental_rerun()
+        #             else:
+        #                 st.error("Failed to create combined PDF. Please try again.")
+        #     else:
+        #         st.warning("Please enter a doctor name for PDF combination.")
+
+        # if 'combined_pdf' in st.session_state:
+        #     st.download_button(
+        #         label="Download Combined PDF",
+        #         data=st.session_state['combined_pdf'].getvalue(),
+        #         file_name=f"{st.session_state['doctor_name']}_combined.pdf",
+        #         mime="application/pdf"
+        #     )
+        #     st.success("Combined PDF is ready for further processing (e.g., sending faxes).")
 
 
         st.subheader("Select Fax Service")
         fax_service = st.radio(
             "Choose a fax service:",
-            ["SRFax", "HumbleFax", "HalloFax", "FaxPlus"],
+            ["SRFax", "HumbleFax",  "FaxPlus"],
             horizontal=True
         )
         # # Receiver number input
@@ -1383,10 +1200,10 @@ def main():
         if st.button("Send Fax"):
             if not uploaded_cover_sheet and (not receiver_number or not fax_message or not fax_subject or not to_name or not chaser_name):
                 st.error("Please provide all required fields to generate a cover sheet.")
-            elif 'combined_pdf' not in st.session_state:
+            elif 'uploaded_pdfs' not in st.session_state:
                 st.error("Please combine PDFs before sending a fax.")
             else:
-                combined_pdf = st.session_state.get('combined_pdf')
+                combined_pdf = st.session_state.get('uploaded_pdfs')
                 chaser_number = chasers_dict.get(chaser_name, "")
                 fax_message_with_number = f"{fax_message}<br><br><b>From: {chaser_name} {chaser_number}</b>" if fax_message else ""
 
