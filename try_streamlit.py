@@ -235,7 +235,7 @@ def handle_srfax(combined_pdf, receiver_number, fax_message, fax_subject, to_nam
     else:
         # If no cover sheet is uploaded, use the text fields to generate a cover page
         payload.update({
-            "sCoverPage": "Company",
+            "sCoverPage": "Standard",
             "sCPFromName": cp_from_name,
             "sCPToName": cp_to_name,
             "sCPOrganization": cp_organization,

@@ -1,488 +1,319 @@
+# from xhtml2pdf import pisa
 
-
-import json
-import io
-import streamlit as st
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseDownload
-from PyPDF2 import PdfMerger, PdfReader
-
-# # Define SCOPES
-# SCOPES = ["https://www.googleapis.com/auth/drive"]
-
-# # Load credentials from secrets
-# credentials_json = st.secrets["google_credentials"]["credentials_json"]
-
-# # Function to update st.secrets
-# def update_secrets(key, value):
-#     st.secrets[key] = value
-
-# def get_drive_service(creds):
-#     return build('drive', 'v3', credentials=creds)
-
-# def generate_and_upload_token():
-#     try:
-#         # Generate credentials and token
-#         flow = InstalledAppFlow.from_client_config(
-#             json.loads(credentials_json), SCOPES
-#         )
-#         creds = flow.run_local_server(port=0)
+# def generate_prescription_request_html(date, fname, lname, ptPhone, ptAddress, ptCity, ptState, ptZip, ptDob, medID, ptHeight, ptWeight, ptGender, drName, drAddress, drCity, drState, drZip, drPhone, drFax, drNpi):
+#     html_body = f"""
+# <!DOCTYPE html>
+# <html lang="en">
+# <head>
+#     <meta charset="UTF-8">
+#     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+#     <title>Prior Authorization Prescription Request Form</title>
+# </head>
+# <body style="font-family: Arial, sans-serif; line-height: 1.6; margin: 0; padding: 20px; font-size: 12px; max-width: 210mm; min-height: 297mm;">
+#     <div style="text-align: center; margin-bottom: 20px;">
+#         <h2 style="font-size: 18px;">PRIOR AUTHORIZATION PRESCRIPTION REQUEST FORM</h2>
+#         <p>PLEASE SEND THIS FORM BACK IN 3 BUSINESS DAYS</p>
+#         <p>WITH THE PT CHART NOTES ( RECENT MEDICAL RECORDS ) AND THE FAX COVER SHEET</p>
+#     </div>
+    
+#     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+#         <div style="border: 1px solid #000; padding: 10px;">
+#             <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+#                 <div>Date: {date}</div>
+#                 <div>First: {fname}</div>
+#                 <div>Last: {lname}</div>
+#             </div>
+#             <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+#                 <div>DOB: {ptDob}</div>
+#                 <div>Gender: {ptGender}</div>
+#             </div>
+#             <div style="margin-bottom: 5px;">Address: {ptAddress}</div>
+#             <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+#                 <div>City: {ptCity}</div>
+#                 <div>State: {ptState}</div>
+#                 <div>Postal Code: {ptZip}</div>
+#             </div>
+#             <div style="margin-bottom: 5px;">Patient Phone Number: {ptPhone}</div>
+#             <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+#                 <div>Primary Insurance: Medicare</div>
+#                 <div>ID/HICN/MBI: {medID}</div>
+#             </div>
+#                      <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+#                 <div>Private Ins: </div>
+#                 <div>Policy #:{medID}</div>
+#             </div>
+#             <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+#                 <div>Height: {ptHeight}</div>
+#                 <div>Weight: {ptWeight}</div>
+#             </div>
+#         </div>
         
-#         # Save token to Streamlit secrets
-#         token_json = creds.to_json()
-#         update_secrets("google_credentials.token_json", token_json)
+#         <div style="border: 1px solid #000; padding: 10px;">
+#             <div style="margin-bottom: 5px;">Physician Name: {drName}</div>
+#             <div style="margin-bottom: 5px;">NPI: {drNpi}</div>
+#             <div style="margin-bottom: 5px;">Address: {drAddress}</div>
+#             <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+#                 <div>City: {drCity}</div>
+#                 <div>State: {drState}</div>
+#                 <div>Postal code: {drZip}</div>
+#             </div>
+#             <div style="margin-bottom: 5px;">Phone Number: {drPhone}</div>
+#             <div style="margin-bottom: 5px;">Fax Number: {drFax}</div>
+#         </div>
+#     </div>
+    
+#     <div style="margin-top: 20px;">
+#         <h3 style="font-size: 14px;">DIAGNOSIS: Provider can specify all of the diagnosis which they feel is appropriate</h3>
+#         <div style="margin-bottom: 5px;">
+#             <input type="checkbox" id="diag1" name="diag1">
+#             <label for="diag1">Primary osteoarthritis, right ankle and foot (M19.071)</label>
+#         </div>
+#         <div style="margin-bottom: 5px;">
+#             <input type="checkbox" id="diag2" name="diag2">
+#             <label for="diag2">Primary osteoarthritis, left ankle and foot (M19.072)</label>
+#         </div>
+#         <div style="margin-bottom: 5px;">
+#             <input type="checkbox" id="diag2" name="diag2">
+#             <label for="diag2">Primary osteoarthritis, left ankle and foot (M19.072)</label>
+#         </div>
+#         <div style="margin-bottom: 5px;">
+#             <input type="checkbox" id="diag2" name="diag2">
+#             <label for="diag2">Primary osteoarthritis, left ankle and foot (M19.072)</label>
+#         </div>
+#                 <div style="margin-bottom: 5px;">
+#             <input type="checkbox" id="diag2" name="diag2">
+#             <label for="diag2">Primary osteoarthritis, left ankle and foot (M19.072)</label>
+#         </div>
+#                 <div style="margin-bottom: 5px;">
+#             <input type="checkbox" id="diag2" name="diag2">
+#             <label for="diag2">Primary osteoarthritis, left ankle and foot (M19.072)</label>
+#         </div>
+#                 <div style="margin-bottom: 5px;">
+#             <input type="checkbox" id="diag2" name="diag2">
+#             <label for="diag2">Primary osteoarthritis, left ankle and foot (M19.072)</label>
+#         </div>
+#                 <div style="margin-bottom: 5px;">
+#             <input type="checkbox" id="diag2" name="diag2">
+#             <label for="diag2">Primary osteoarthritis, left ankle and foot (M19.072)</label>
+#         </div>
+#                 <div style="margin-bottom: 5px;">
+#             <input type="checkbox" id="diag2" name="diag2">
+#             <label for="diag2">Primary osteoarthritis, left ankle and foot (M19.072)</label>
+#         </div>
+#                 <div style="margin-bottom: 5px;">
+#             <input type="checkbox" id="diag2" name="diag2">
+#             <label for="diag2">Sprain of unspecified ligament of right ankle (S93.401)</label>
+#         </div>
         
-#         print('Token generated and saved to Streamlit secrets successfully!')
-#         return creds
-#     except Exception as e:
-#         print(f'Error generating token: {e}')
-#         return None
-
-# def get_credentials():
-#     token_data = st.secrets["google_credentials"].get("token_json")
+#     </div>
     
-#     if token_data:
-#         creds = Credentials.from_authorized_user_info(json.loads(token_data), SCOPES)
-#     else:
-#         creds = generate_and_upload_token()
-#         if not creds:
-#             return None
+#     <div style="border: 1px solid #000; padding: 10px; margin-top: 20px;">
+#         <h3 style="font-size: 14px;">AFFECTED AREA</h3>
+#         <div style="display: flex; justify-content: ;">
+#             <div>
+#                 <input type="checkbox" id="leftAnkle" name="leftAnkle">
+#                 <label for="leftAnkle">Left ankle</label>
+#             </div>
+#             <div>
+#                 <input type="checkbox" id="rightAnkle" name="rightAnkle">
+#                 <label for="rightAnkle">Right Ankle</label>
+#             </div>
+#         </div>
+#     </div>
     
-#     return creds
-
-# def combine_pdfs(fname):
-#     creds = get_credentials()
-#     if not creds:
-#         return None, "Failed to obtain valid credentials. Please try authenticating again."
-
-#     try:
-#         service = get_drive_service(creds)
-#         folder_id = "15I95Loh35xI2PcGa36xz7SgMtclo-9DC"
-#         query = f"'{folder_id}' in parents"
-
-#         print("Querying Google Drive...")
-#         results = service.files().list(q=query, pageSize=20, fields="nextPageToken, files(id, name, mimeType)").execute()
-#         items = results.get("files", [])
-
-#         if not items:
-#             return None, "No files found in the specified folder."
-
-#         fname = fname.strip().lower()
-#         target_files = [file for file in items if fname in file["name"].lower()]
-
-#         print(f"Searching for files with name containing: {fname}")
-#         for file in items:
-#             print(f"Found file: {file['name']}")
-
-#         if not target_files:
-#             return None, "No matching files found."
-
-#         print(f"Found {len(target_files)} matching files. Combining PDFs...")
-
-#         merger = PdfMerger()
-#         for target_file in target_files:
-#             mime_type = target_file.get("mimeType")
-#             file_id = target_file.get("id")
-
-#             print(f"Processing file: {target_file['name']}")
-
-#             if mime_type.startswith("application/vnd.google-apps."):
-#                 request = service.files().export_media(fileId=file_id, mimeType="application/pdf")
-#             else:
-#                 request = service.files().get_media(fileId=file_id)
-
-#             fh = io.BytesIO()
-#             downloader = MediaIoBaseDownload(fh, request)
-#             done = False
-#             while not done:
-#                 status, done = downloader.next_chunk()
-#                 print(f"Download {int(status.progress() * 100)}%")
-#             fh.seek(0)
-
-#             pdf_reader = PdfReader(fh)
-#             merger.append(pdf_reader)
-
-#         print("Finalizing PDF...")
-#         output = io.BytesIO()
-#         merger.write(output)
-#         merger.close()
-#         output.seek(0)
-#         print("PDF combination complete!")
-
-#         return output, None
-#     except Exception as error:
-#         print(f"An error occurred: {str(error)}")
-#         return None, str(error)
-
-# # Streamlit UI
-# st.header("Combine PDFs")
-
-# doctor_name = st.text_input("Enter Doctor Name for PDF combination")
-# if st.button("Combine PDFs"):
-#     if doctor_name:
-#         with st.spinner("Combining PDFs..."):
-#             combined_pdf, error = combine_pdfs(doctor_name)
-#             if error:
-#                 st.error(f"Error combining PDFs: {error}")
-#             elif combined_pdf:
-#                 st.success(f"Combined PDF for {doctor_name} created successfully.")
-#                 st.session_state['combined_pdf'] = combined_pdf
-#                 st.session_state['doctor_name'] = doctor_name
-#                 st.experimental_rerun()
-#             else:
-#                 st.error("Failed to create combined PDF. Please try again.")
-#     else:
-#         st.warning("Please enter a doctor name for PDF combination.")
-
-# if 'combined_pdf' in st.session_state:
-#     st.download_button(
-#         label="Download Combined PDF",
-#         data=st.session_state['combined_pdf'].getvalue(),
-#         file_name=f"{st.session_state['doctor_name']}_combined.pdf",
-#         mime="application/pdf"
-#     )
-#     st.success("Combined PDF is ready for further processing (e.g., sending faxes).")
-
-
-
-
-import streamlit as st
-import pdfkit
-from datetime import datetime
-from pdfkit import configuration, from_string
-
-config = configuration(wkhtmltopdf="C:\\Program Files\\wkhtmltopdf\\bin\\wkhtmltopdf.exe")
-# Define the list of braces
-Braces = ["Ankle", "Knee", "Back", "Wrist", "Shoulder", "Elbow", "Hips"]
-
-# Initialize selected_forms dictionary
-selected_forms = {}
-
-def display_brace(brace, column):
-    if brace not in st.session_state:
-        st.session_state[brace] = "None"
-
-    with column:
-        st.subheader(f"{brace} Brace")
-        brace_options = ["None", "Selected"]
-        selected_forms[brace] = st.radio(
-            f"Select {brace} Brace",
-            brace_options,
-            key=brace,
-            index=brace_options.index(st.session_state[brace])
-        )
-
-def validate_all_fields():
-    required_fields = [
-        fname, lname, ptPhone, ptAddress,
-        ptCity, ptState, ptZip, ptDob, medID,
-        ptHeight, ptWeight, drName,
-        drAddress, drCity, drState, drZip,
-        drPhone, drFax, drNpi
-    ]
-    for field in required_fields:
-        if not field:
-            st.warning(f"{field} is required.")
-            return False
-    return True
-
-def generate_prescription_request_html(date, fname, lname, ptPhone, ptAddress, ptCity, ptState, ptZip, ptDob, medID, ptHeight, ptWeight, ptGender, drName, drAddress, drCity, drState, drZip, drPhone, drFax, drNpi, selected_braces):
-    html_body = f"""
-
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Prior Authorization Prescription Request Form</title>
-</head>
-<body style="font-family: Arial, sans-serif; line-height: 1.2; font-size: 10px; width: 210mm; height: 297mm; margin: 0 auto; padding: 20mm 15mm; box-sizing: border-box;">
-    <div style="text-align: center; margin-bottom: 15px;">
-        <h2 style="font-size: 14px; margin: 0 0 5px; font-weight: bold;">PRIOR AUTHORIZATION PRESCRIPTION REQUEST FORM FOR BACK ORTHOSIS</h2>
-        <p style="margin: 0; font-size: 9px;">PLEASE SEND THIS FORM BACK IN 3 BUSINESS DAYS</p>
-        <p style="margin: 0; font-size: 9px;">WITH THE PT CHART NOTES (RECENT MEDICAL RECORDS) AND THE FAX COVER SHEET</p>
-    </div>
-
-    <div style="display: flex; justify-content: space-between; margin-top: 15px;">
-        <div style="width: 48%; border: 1px solid black; padding: 10px;">
-            <div style="display: flex; justify-content: space-between;">
-                <div style="width: 48%;">
-                    <div style="margin-bottom: 5px;"><span style="font-weight: bold;">Date:</span> {date}</div>
-                    <div style="margin-bottom: 5px;"><span style="font-weight: bold;">First:</span> {fname}</div>
-                    <div style="margin-bottom: 5px;"><span style="font-weight: bold;">DOB:</span> {ptDob}</div>
-                    <div style="margin-bottom: 5px;"><span style="font-weight: bold;">Gender:</span> {ptGender}</div>
-                    <div style="margin-bottom: 5px;"><span style="font-weight: bold;">Address:</span> {ptAddress}</div>
-                    <div style="margin-bottom: 5px;"><span style="font-weight: bold;">City:</span> {ptCity}</div>
-                    <div style="margin-bottom: 5px;"><span style="font-weight: bold;">State:</span> {ptState}</div>
-                    <div style="margin-bottom: 5px;"><span style="font-weight: bold;">Postal Code:</span> {ptZip}</div>
-                </div>
-                <div style="width: 48%;">
-                    <div style="margin-bottom: 5px;"><span style="font-weight: bold;">&nbsp;</span></div>
-                    <div style="margin-bottom: 5px;"><span style="font-weight: bold;">Last:</span> {lname}</div>
-                    <div style="margin-bottom: 5px;"><span style="font-weight: bold;">Patient Phone:</span> {ptPhone}</div>
-                    <div style="margin-bottom: 5px;"><span style="font-weight: bold;">Primary Ins:</span> Medicare</div>
-                    <div style="margin-bottom: 5px;"><span style="font-weight: bold;">Policy #:</span> {medID}</div>
-                    <div style="margin-bottom: 5px;"><span style="font-weight: bold;">Height:</span> {ptHeight}</div>
-                    <div style="margin-bottom: 5px;"><span style="font-weight: bold;">Weight:</span> {ptWeight}</div>
-                </div>
-            </div>
-        </div>
-        <div style="width: 48%; border: 1px solid black; padding: 10px;">
-            <div style="margin-bottom: 5px;"><span style="font-weight: bold;">Physician Name:</span> {drName}</div>
-            <div style="margin-bottom: 5px;"><span style="font-weight: bold;">NPI:</span> {drNpi}</div>
-            <div style="margin-bottom: 5px;"><span style="font-weight: bold;">Address:</span> {drAddress}</div>
-            <div style="margin-bottom: 5px;"><span style="font-weight: bold;">City:</span> {drCity}</div>
-            <div style="margin-bottom: 5px;"><span style="font-weight: bold;">State:</span> {drState}</div>
-            <div style="margin-bottom: 5px;"><span style="font-weight: bold;">Postal Code:</span> {drZip}</div>
-            <div style="margin-bottom: 5px;"><span style="font-weight: bold;">Phone Number:</span> {drPhone}</div>
-            <div style="margin-bottom: 5px;"><span style="font-weight: bold;">Fax Number:</span> {drFax}</div>
-        </div>
-    </div>
-
-    <div style="font-weight: bold; margin-top: 15px; margin-bottom: 10px;">DIAGNOSIS: Provider can specify all of the diagnoses they feel are appropriate</div>
-    <div style="display: grid; ; gap: 5px;">
-        <div><input type="checkbox" style="margin-right: 5px;">Lumbar Intervertebral Disc Degeneration (M51.36)</div>
-        <div><input type="checkbox" style="margin-right: 5px;">Other intervertebral disc displacement, lumbar region (M51.26)</div>
-        <div><input type="checkbox" style="margin-right: 5px;">Spinal Stenosis, lumbar region (M48.06)</div>
-        <div><input type="checkbox" style="margin-right: 5px;">Spinal instability, lumbosacral region (M53.2X7)</div>
-        <div><input type="checkbox" style="margin-right: 5px;">Other intervertebral disc disorders, lumbosacral region (M51.87)</div>
-        <div><input type="checkbox" style="margin-right: 5px;">Low back pain (M54.5)</div>
-    </div>
-
-    <div style="font-weight: bold; margin-top: 15px; margin-bottom: 10px;">AFFECTED AREA</div>
-    <div><input type="checkbox" style="margin-right: 5px;">Back</div>
-
-    <p style="margin-top: 15px;">Our evaluation of the above patient has determined that providing the following Back orthosis products will benefit this patient.</p>
-
-    <div style="font-weight: bold; margin-top: 15px; margin-bottom: 10px;">DISPENSE</div>
-    <p style="margin-bottom: 15px;">L0457 - TLSO, flexible, provides trunk support, thoracic region, rigid posterior panel and soft anterior apron, extends from the sacrococcygeal junction and terminates just inferior to the scapular spine, restricts gross trunk motion in the sagittal plane, produces intracavitary pressure to reduce load on the intervertebral discs, includes straps and closures, prefabricated item that has been trimmed, bent, molded, assembled, or otherwise customized to fit a specific patient by an individual with expertise</p>
-
-    <p>Length of need is 99 months unless otherwise specified: _____ 99-99 (LIFETIME)</p>
-
-    <div style="border-top: 1px solid black; margin-top: 20px; padding-top: 10px;">
-        <div style="display: flex; justify-content: space-between;">
-            <div>Physician Signature: _________________________</div>
-            <div>Date signed: _________________________</div>
-        </div>
-    </div>
-    <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
-        <tr>
-            <td style="border: 1px solid black; padding: 5px;"><span style="font-weight: bold;">Physician Name:</span> {drName}</td>
-            <td style="border: 1px solid black; padding: 5px;"><span style="font-weight: bold;">NPI:</span> {drNpi}</td>
-        </tr>
-    </table>
-</body>
-</html>
-    """
+#     <div style="border: 1px solid #000; padding: 10px; margin-top: 20px;">
+#         <h3 style="font-size: 14px;">DISPENSE</h3>
+#         <p>L1971: Ankle foot orthosis, plastic or other material with ankle joint, prefabricated, includes fitting and adjustment</p>
+#         <p>Length of need is 99 months unless otherwise specified: _____ 99-99 (LIFETIME)</p>
+#     </div>
     
-    return html_body
+#     <div style="border: 1px solid #000; padding: 10px; margin-top: 20px;">
+#         <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+#             <div>Physician Signature: _________________________</div>
+#             <div>Date signed: _________________________</div>
+#         </div>
+#         <div style="display: flex; justify-content: space-between;">
+#             <div>Physician Name: {drName}</div>
+#             <div>NPI: {drNpi}</div>
+#         </div>
+#     </div>
+# </body>
+# </html>
+#     """
+#     return html_body
 
-
-# Streamlit app
-st.title("Brace Form Submission")
-
-st.header("Patient and Doctor Information")
-col1, col2 = st.columns(2)
-
-with col1:
-    st.subheader("Patient Information")
-    date = st.date_input("Date")
-    fname = st.text_input("First Name")
-    lname = st.text_input("Last Name")
-    ptPhone = st.text_input("Patient Phone Number")
-    ptAddress = st.text_input("Patient Address")
-    ptCity = st.text_input("Patient City")
-    ptState = st.text_input("Patient State")
-    ptZip = st.text_input("Patient Zip Code")
-    ptDob = st.text_input("Date of Birth")
-    medID = st.text_input("MBI")
-    ptHeight = st.text_input("Height")
-    ptWeight = st.text_input("Weight")
-    ptGender = st.selectbox("Gender", ["Male", "Female"])
-
-with col2:
-    st.subheader("Doctor Information")
-    drName = st.text_input("Doctor Name")
-    drAddress = st.text_input("Doctor Address")
-    drCity = st.text_input("Doctor City")
-    drState = st.text_input("Doctor State")
-    drZip = st.text_input("Doctor Zip Code")
-    drPhone = st.text_input("Doctor Phone Number")
-    drFax = st.text_input("Doctor Fax Number")
-    drNpi = st.text_input("Doctor NPI")
-
-st.header("Select Braces")
-col1, col2, col3, col4 = st.columns(4)
-col5, col6, col7 = st.columns(3)
-
-# Display the first 4 braces in the first row
-for idx, brace in enumerate(Braces[:4]):
-    display_brace(brace, [col1, col2, col3, col4][idx])
-
-# Display the remaining 3 braces in the second row
-for idx, brace in enumerate(Braces[4:]):
-    display_brace(brace, [col5, col6, col7][idx])
-
-if st.button("Submit"):
-    if not validate_all_fields():
-        st.warning("Please fill out all required fields.")
-    else:
-        selected_braces = [brace for brace, selection in selected_forms.items() if selection == "Selected"]
-
-        if not selected_braces:
-            st.warning("Please select at least one brace.")
-        else:
-            # Generate HTML content
-            html_content = generate_prescription_request_html(
-                date.strftime("%m/%d/%Y"), fname, lname, ptPhone, ptAddress, ptCity, ptState, ptZip,
-                ptDob, medID, ptHeight, ptWeight, ptGender, drName, drAddress, drCity, drState,
-                drZip, drPhone, drFax, drNpi, selected_braces
-            )
-
-            # Convert HTML to PDF
-            options = {
-    'page-size': 'A4',
-    'margin-top': '1in',
-    'margin-right': '1in',
-    'margin-bottom': '1in',
-    'margin-left': '1in',
-    'encoding': "UTF-8",
-    'no-outline': None
-}
-            pdf_filename = f"prescription_request_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
-            from_string(html_content, pdf_filename, configuration=config , options=options)
-
-            # Provide download link for the generated PDF
-            with open(pdf_filename, "rb") as pdf_file:
-                pdf_bytes = pdf_file.read()
-                st.download_button(
-                    label="Download Prescription Request PDF",
-                    data=pdf_bytes,
-                    file_name=pdf_filename,
-                    mime="application/pdf"
-                )
-
-            st.success(f"Prescription request for {', '.join(selected_braces)} brace(s) has been generated. Click the button above to download the PDF.")
-
-
-
-# from reportlab.lib import colors
-# from reportlab.lib.pagesizes import letter
-# from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-# from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-# from reportlab.lib.units import inch
-# from reportlab.pdfbase import pdfmetrics
-# from reportlab.pdfbase.ttfonts import TTFont
-
-# def generate_prescription_request_pdf(date, fname, lname, ptPhone, ptAddress, ptCity, ptState, ptZip, ptDob, medID, ptHeight, ptWeight, ptGender, drName, drAddress, drCity, drState, drZip, drPhone, drFax, drNpi):
-#     pdf_filename = f"prescription_request_{date.replace('/', '')}.pdf"
-#     doc = SimpleDocTemplate(pdf_filename, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch, leftMargin=0.5*inch, rightMargin=0.5*inch)
-    
-#     elements = []
-#     styles = getSampleStyleSheet()
-    
-#     # Header
-#     header_style = ParagraphStyle('Header', fontSize=10, leading=12, alignment=1)
-#     elements.append(Paragraph("PRIOR AUTHORIZATION PRESCRIPTION REQUEST FORM FOR Back orthotic", header_style))
-#     elements.append(Paragraph("PLEASE SEND THIS FORM BACK IN 3 BUSINESS DAYS", header_style))
-#     elements.append(Paragraph("Note:- Fax: +1 (888) 831-8047       Phone: +1 (786) 391-3722", header_style))
-#     elements.append(Paragraph("WITH THE PT CHART NOTES (RECENT MEDICAL RECORDS) AND THE FAX COVER SHEET", header_style))
-#     elements.append(Spacer(1, 0.1*inch))
-    
-#     # Patient and Physician Information
-#     data = [
-#         [f"Date: {date}", "", f"Physician Name: {drName}"],
-#         [f"First: {fname}", f"Last: {lname}", f"NPI: {drNpi}"],
-#         [f"DOB: {ptDob}", f"Gender: {ptGender}", f"Address: {drAddress}"],
-#         [f"Address: {ptAddress}", "", f"City: {drCity}"],
-#         [f"City: {ptCity}", "", f"State: {drState}"],
-#         [f"State: {ptState}", "", f"Postal code: {drZip}"],
-#         [f"Postal Code: {ptZip}", "", f"Phone Number: {drPhone}"],
-#         [f"Patient Phone Number: {ptPhone}", "", f"Fax Number: {drFax}"],
-#         [f"Primary Ins: Medicare", f"Policy #: {medID}", ""],
-#         [f"Private Ins:", "Policy #", ""],
-#         [f"Height: {ptHeight}", f"Weight: {ptWeight}", ""]
-#     ]
-    
-#     t = Table(data, colWidths=[2.3*inch, 2.3*inch, 2.3*inch])
-#     t.setStyle(TableStyle([
-#         ('GRID', (0,0), (-1,-1), 1, colors.black),
-#         ('FONTSIZE', (0,0), (-1,-1), 8),
-#         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-#         ('ALIGN', (0,0), (-1,-1), 'LEFT'),
-#         ('LEFTPADDING', (0,0), (-1,-1), 5),
-#         ('RIGHTPADDING', (0,0), (-1,-1), 5),
-#         ('TOPPADDING', (0,0), (-1,-1), 3),
-#         ('BOTTOMPADDING', (0,0), (-1,-1), 3),
-#     ]))
-#     elements.append(t)
-    
-#     # Additional text
-#     elements.append(Spacer(1, 0.1*inch))
-#     additional_text = """This patient is being treated under a comprehensive plan of care for breast pain.
-# I, the undersigned, certify that the prescribed orthosis is medically necessary for the patient's overall well-being. In my opinion, the following
-# medical product are both reasonable and necessary in reference to treatment of the patient's condition and/or illness. All statements contained
-# has been in care regarding the diagnosis below. This is the treatment I see fit for this patient at this time. I certify that this information is true
-# and correct."""
-#     elements.append(Paragraph(additional_text, ParagraphStyle('Small', fontSize=6, leading=8)))
-    
-#     # Diagnosis section
-#     elements.append(Spacer(1, 0.1*inch))
-#     elements.append(Paragraph("DIAGNOSIS:Provider can simply cut off the diagnosis which they don't find appropriate", ParagraphStyle('Small', fontSize=8, leading=10)))
-    
-#     diagnosis_data = [
-#         ["□ Lumbar/ Lumbosacral Intervertebral Disc Degeneration (M51.36)"],
-#         ["□ Other intervertebral disc degeneration, lumbosacral region (M51.37)"],
-#         ["□ Spinal Stenosis, lumbar region(M48.06)"],
-#         ["□ Spinal stenosis, lumbosacral region (M48.07)"],
-#         ["□ Other Intervertebral disc disorders, lumbosacral region (M51.87)"],
-#         ["□ Low back pain (M54.5)"]
-#     ]
-    
-#     diagnosis_table = Table(diagnosis_data, colWidths=[7*inch])
-#     diagnosis_table.setStyle(TableStyle([
-#         ('FONTSIZE', (0,0), (-1,-1), 8),
-#         ('VALIGN', (0,0), (-1,-1), 'TOP'),
-#     ]))
-#     elements.append(diagnosis_table)
-    
-#     # Affected Area
-#     elements.append(Spacer(1, 0.1*inch))
-#     elements.append(Paragraph("AFFECTED AREA:", ParagraphStyle('Small', fontSize=8, leading=10)))
-#     elements.append(Paragraph("☑ Back", ParagraphStyle('Small', fontSize=8, leading=10)))
-    
-#     # Dispensing
-#     elements.append(Spacer(1, 0.1*inch))
-#     elements.append(Paragraph("DISPENSE:", ParagraphStyle('Small', fontSize=8, leading=10)))
-#     elements.append(Paragraph("L0457 - lumbar-Sacral Orthosis, Sagittal-Coronal Control, With Rigid Anterior And Posterior Frame/Panel(S), Posterior Extends From Sacrococcygeal Junction To T-9 Vertebra, Lateral Strength Provided By Rigid Lateral Frame/Panel(S), Produces Intracavitary Pressure To Reduce Load On Intervertebral Discs, Includes Straps, Closures, May Include Padding, Shoulder Straps, Pendulous Abdomen Design, Prefabricated, Off-The-Shelf", ParagraphStyle('Small', fontSize=8, leading=10)))
-    
-#     # Length of need
-#     elements.append(Spacer(1, 0.1*inch))
-#     elements.append(Paragraph("Length of need is 99 months unless otherwise specified _____________ 6 - 99 (99= LIFETIME)", ParagraphStyle('Small', fontSize=8, leading=10)))
-    
-#     # Signature
-#     elements.append(Spacer(1, 0.5*inch))
-#     signature_data = [
-#         ["Physician Signature: _________________________", "Date signed: _____________"],
-#         [f"Physician Name: {drName}", f"NPI: {drNpi}"]
-#     ]
-#     signature_table = Table(signature_data, colWidths=[3.5*inch, 3.5*inch])
-#     signature_table.setStyle(TableStyle([
-#         ('FONTSIZE', (0,0), (-1,-1), 8),
-#         ('VALIGN', (0,0), (-1,-1), 'TOP'),
-#     ]))
-#     elements.append(signature_table)
-    
-#     doc.build(elements)
-#     return pdf_filename
+# def convert_html_to_pdf(source_html, output_filename):
+#     result_file = open(output_filename, "w+b")
+#     pisa_status = pisa.CreatePDF(source_html, dest=result_file)
+#     result_file.close()
+#     return pisa_status.err
 
 # # Example usage
-# pdf_file = generate_prescription_request_pdf(
-#     "08/01/2024", "Leonard", "Hoskins", "(502) 592-8750", "2215 Pikes Peak Blvd", "Louisville", "KY", "40214", "11/14/1952", "1DVODN6EG39",
-#     "5'1", "250", "Male", "Dr. Lal Tanwani, MD", "1900 Bluegrass Ave # 108", "Louisville", "KY", "40215", "(502) 361-2524", "(502) 361-2525", "1336133347"
-# )
-# print(f"PDF generated: {pdf_file}")
+# date = "08/01/2024"
+# fname = "Leonard"
+# lname = "Hoskins"
+# ptPhone = "(502) 592-8750"
+# ptAddress = "2215 Pikes Peak Blvd"
+# ptCity = "Louisville"
+# ptState = "KY"
+# ptZip = "40214"
+# ptDob = "11/14/1952"
+# medID = "Med123456789"
+# ptHeight = "5'1\""
+# ptWeight = "168 lbs"
+# ptGender = "Male"
+# drName = "Dr. John Doe"
+# drAddress = "123 Main Street"
+# drCity = "Cityville"
+# drState = "ST"
+# drZip = "12345"
+# drPhone = "(123) 456-7890"
+# drFax = "(123) 456-7891"
+# drNpi = "1234567890"
+
+# html_content = generate_prescription_request_html(date, fname, lname, ptPhone, ptAddress, ptCity, ptState, ptZip, ptDob, medID, ptHeight, ptWeight, ptGender, drName, drAddress, drCity, drState, drZip, drPhone, drFax, drNpi)
+
+# pdf_filename = 'prescription_request.pdf'
+# if convert_html_to_pdf(html_content, pdf_filename) == 0:
+#     print(f"PDF generated successfully: {pdf_filename}")
+# else:
+#     print("Error generating PDF")
 
 
+
+from reportlab.lib.pagesizes import letter
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+
+def create_pdf(filename, data):
+    doc = SimpleDocTemplate(filename, pagesize=letter)
+    styles = getSampleStyleSheet()
+
+    elements = []
+
+    # Title
+    title = Paragraph("PRIOR AUTHORIZATION PRESCRIPTION REQUEST FORM FOR BACK ORTHOSIS", styles['Title'])
+    elements.append(title)
+    elements.append(Spacer(1, 12))
+
+    sub_title = Paragraph("PLEASE SEND THIS FORM BACK IN 3 BUSINESS DAYS<br/>"
+                          "WITH THE PT CHART NOTES (RECENT MEDICAL RECORDS) AND THE FAX COVER SHEET", styles['Normal'])
+    elements.append(sub_title)
+    elements.append(Spacer(1, 12))
+
+    # Table data
+    table_data = [
+        ["Date:", data['date'], "Physician Name:", data['drName']],
+        ["First:", data['fName'], "NPI:", data['drNpi']],
+        ["Last:", data['lName'], "Address:", data['drAddress']],
+        ["DOB:", data['ptDob'], "City:", data['drCity']],
+        ["Gender:", data['ptGender'], "State:", data['drState']],
+        ["Address:", data['ptAddress'], "Postal Code:", data['drZip']],
+        ["City:", data['ptCity'], "Phone Number:", data['drPhone']],
+        ["State:", data['ptState'], "Fax Number:", data['drFax']],
+        ["Postal Code:", data['ptZip'], "", ""],
+        ["Patient Phone:", data['ptPhone'], "", ""],
+        ["Primary Ins:", data['medIns'], "", ""],
+        ["Policy #:", data['medId'], "", ""],
+        ["Height:", data['ptHeight'], "", ""],
+        ["Weight:", data['ptWeight'], "", ""]
+    ]
+
+    # Create table
+    table = Table(table_data, colWidths=[100, 200, 100, 200])
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.whitesmoke),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+    ]))
+
+    elements.append(table)
+    elements.append(Spacer(1, 12))
+
+    # Diagnosis checkboxes (just text in this case)
+    diagnosis_title = Paragraph("DIAGNOSIS: Provider can specify all of the diagnoses they feel are appropriate", styles['Normal'])
+    elements.append(diagnosis_title)
+    elements.append(Spacer(1, 12))
+
+    diagnoses = ['Lumbar Intervertebral Disc Degeneration (M51.36)',
+                 'Other intervertebral disc displacement, lumbar region (M51.26)',
+                 'Spinal Stenosis, lumbar region (M48.06)',
+                 'Spinal instability, lumbosacral region (M53.2X7)',
+                 'Other intervertebral disc disorders, lumbosacral region (M51.87)',
+                 'Low back pain (M54.5)']
+
+    for diagnosis in diagnoses:
+        elements.append(Paragraph(f'<bullet>&#x2610;</bullet> {diagnosis}', styles['Normal']))
+
+    elements.append(Spacer(1, 12))
+
+    # Affected Area
+    affected_area_title = Paragraph("AFFECTED AREA", styles['Normal'])
+    elements.append(affected_area_title)
+    elements.append(Spacer(1, 12))
+
+    elements.append(Paragraph('<bullet>&#x2610;</bullet> Back', styles['Normal']))
+    elements.append(Spacer(1, 12))
+
+    # Dispense
+    dispense_title = Paragraph("DISPENSE", styles['Normal'])
+    elements.append(dispense_title)
+    elements.append(Spacer(1, 12))
+
+    dispense_text = ("L0457 - TLSO, flexible, provides trunk support, thoracic region, "
+                     "rigid posterior panel and soft anterior apron, extends from the "
+                     "sacrococcygeal junction and terminates just inferior to the scapular spine, "
+                     "restricts gross trunk motion in the sagittal plane, produces intracavity pressure "
+                     "to reduce load on the intervertebral discs, includes straps and closures, "
+                     "prefabricated item that has been trimmed, bent, molded, assembled, or otherwise "
+                     "customized to fit a specific patient by an individual with expertise.")
+    elements.append(Paragraph(dispense_text, styles['Normal']))
+
+    elements.append(Spacer(1, 24))
+
+    # Footer
+    elements.append(Paragraph("Length of need is 99 months unless otherwise specified: ____________ 99-99 (LIFETIME)", styles['Normal']))
+    elements.append(Spacer(1, 48))
+
+    signature_table = Table([
+        ["Physician Name: " + data['drName'], "NPI: " + data['drNpi']],
+        ["Physician Signature: ____________________", "Date signed: ____________________"]
+    ], colWidths=[300, 300])
+
+    elements.append(signature_table)
+
+    # Build PDF
+    doc.build(elements)
+
+# Example usage
+data = {
+    'date': '08/09/2024',
+    'fName': 'John',
+    'lName': 'Doe',
+    'ptDob': '01/01/1980',
+    'ptGender': 'Male',
+    'ptAddress': '1234 Elm Street',
+    'ptCity': 'Springfield',
+    'ptState': 'IL',
+    'ptZip': '62701',
+    'ptPhone': '555-1234',
+    'medIns': 'Medicare',
+    'medId': '123456',
+    'ptHeight': '6ft',
+    'ptWeight': '180lbs',
+    'drName': 'Dr. Smith',
+    'drNpi': '1234567890',
+    'drAddress': '5678 Oak Street',
+    'drCity': 'Springfield',
+    'drState': 'IL',
+    'drZip': '62701',
+    'drPhone': '555-5678',
+    'drFax': '555-6789'
+}
+
+create_pdf('prescription_request.pdf', data)
